@@ -587,6 +587,11 @@ WeatherProvider.prototype.hasValidData = function() {
             console.log('Data from ' + this.name + ' is good, ready to fetch.');
             return true;
         }
+        console.log('Trend arrays are too short (temp=' + this.tempTrend.length
+            + ' precip=' + this.precipTrend.length
+            + ' uv=' + this.uvTrend.length
+            + ', need ' + this.numEntries + ').');
+        return false;
     }
     else {
         if (!this.hasOwnProperty('tempTrend')) {

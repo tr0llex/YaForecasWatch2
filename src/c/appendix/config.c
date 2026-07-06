@@ -6,6 +6,11 @@
 
 Config *g_config;
 
+// Backing storage for g_config. A static struct instead of malloc: the config
+// always exists exactly once, so there is nothing to gain from heap allocation
+// and no out-of-memory path to worry about.
+static Config s_config;
+
 // Returns defaults as a function (not a static const) because GColor values like
 // GColorBlack expand to "compound literals" — C's syntax for inline struct values.
 // The C standard doesn't allow these in static variable initializers, so we use a
@@ -44,20 +49,19 @@ static void config_read_or_default(Config *config) {
 }
 
 void config_load() {
-    g_config = (Config*) malloc(sizeof(Config));
+    g_config = &s_config;
     config_read_or_default(g_config);
     MEMORY_LOG_HEAP("after_config_load");
 }
 
 void config_refresh() {
-    free(g_config);  // Clear out the old config
-    g_config = (Config*) malloc(sizeof(Config));
-    config_read_or_default(g_config);  // Then reload
+    g_config = &s_config;
+    config_read_or_default(g_config);  // Reload from persistent storage
     MEMORY_LOG_HEAP("after_config_refresh");
 }
 
 void config_unload() {
-    free(g_config);
+    g_config = NULL;
 }
 
 int config_localize_temp(int temp_f) {
