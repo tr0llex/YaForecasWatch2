@@ -14,7 +14,7 @@ Changes relative to the original ForecasWatch2 watchface:
 
 - Added **Yandex Weather** as a third main weather provider.
 - Added **Open-Meteo supplements** for Yandex Weather rain probability and UV index graphs, because those fields are not available in the Yandex Weather Smart Home free tier.
-- Changed the Yandex Weather refresh interval to **60 minutes**, matching the free-tier daily request limit more closely.
+- Changed the Yandex Weather refresh interval to **120 minutes**, matching the free-tier daily request limit more closely.
 - Added **two configurable holiday sets**, with support for US, Russia, Spain national holidays, and Spain national + Catalonia holidays.
 - Holiday data is fetched from **Nager.Date**, cached locally for 30 days, and sent to the watch as compact yearly bitsets so the calendar still works offline.
 - Overlapping holidays from two selected sets are shown with a **split-color date highlight** on color Pebble watches.

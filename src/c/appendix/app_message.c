@@ -59,8 +59,18 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         && current_temp_tuple && city_tuple && sun_events_tuple) {
         // Weather data received
         APP_LOG(APP_LOG_LEVEL_INFO, "All tuples received!");
-        persist_set_forecast_start((time_t)forecast_start_tuple->value->int32);
         const int num_entries = ((int)num_entries_tuple->value->int32);
+        // Don't trust the phone: a malformed payload must not trigger
+        // out-of-bounds reads of the tuple data or persist garbage.
+        if (num_entries < 2 || num_entries > MAX_FORECAST_ENTRIES
+            || temp_trend_tuple->length < (int)(num_entries * sizeof(int16_t))
+            || precip_trend_tuple->length < (int)(num_entries * sizeof(uint8_t))
+            || uv_trend_tuple->length < (int)(num_entries * sizeof(uint8_t))
+            || sun_events_tuple->length < (int)(1 + 2 * sizeof(uint32_t))) {
+            APP_LOG(APP_LOG_LEVEL_WARNING, "Rejecting malformed weather payload (entries=%d)", num_entries);
+            return;
+        }
+        persist_set_forecast_start((time_t)forecast_start_tuple->value->int32);
         persist_set_num_entries(num_entries);
 #ifdef FCW2_ENABLE_MEMORY_LOGGING
         APP_LOG(APP_LOG_LEVEL_DEBUG, "MEM|forecast_payload|entries=%d|free=%lu|used=%lu",
@@ -70,7 +80,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 #endif
         int16_t *temp_data = (int16_t*) temp_trend_tuple->value->data;
         persist_set_temp_trend(temp_data, num_entries);
-        if (feels_like_trend_tuple) {
+        if (feels_like_trend_tuple && feels_like_trend_tuple->length >= (int)(num_entries * sizeof(int16_t))) {
             int16_t *feels_like_data = (int16_t*) feels_like_trend_tuple->value->data;
             persist_set_feels_like_trend(feels_like_data, num_entries);
         }

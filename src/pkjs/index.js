@@ -55,6 +55,7 @@ var DEFAULT_WEATHER_REFRESH_MINUTES = 30;
 var YANDEX_WEATHER_REFRESH_MINUTES = 120;
 var DEFAULT_FETCH_FAILURE_BACKOFF_MS = 5 * 60 * 1000;
 var YANDEX_FETCH_FAILURE_BACKOFF_MS = 60 * 60 * 1000;
+var FETCH_WATCHDOG_MS = 2 * 60 * 1000;
 var DEFAULT_COLOR_WHITE = pebbleColors.GColorWhite;
 var DEFAULT_COLOR_FOLLY = pebbleColors.GColorFolly;
 var DEFAULT_COLOR_YELLOW = pebbleColors.GColorYellow;
@@ -66,6 +67,7 @@ var DEBUG_WEATHER_STATE_STALE_CACHE = 2;
 var DEBUG_STALE_CACHE_MS = 4 * 60 * 60 * 1000;
 
 app.fetchInProgress = false;
+app.fetchStartedAt = 0;
 app.pendingStartupFetch = false;
 
 Pebble.addEventListener('appmessage', function(e) {
@@ -1203,9 +1205,19 @@ function fetch(provider, force, bypassFetchBackoff) {
         return;
     }
 
-    if (app.fetchInProgress) {
+    if (app.fetchInProgress && Date.now() - app.fetchStartedAt < FETCH_WATCHDOG_MS) {
         console.log('Skipping weather fetch: another fetch is already in progress.');
         return;
+    }
+
+    if (app.fetchInProgress) {
+        // An exception inside an async provider callback can leave the flag set
+        // forever; without this reset the weather would never refresh again.
+        console.log('Previous fetch never completed within the watchdog window; continuing.');
+        appendDebugWeatherLog('fetch_watchdog_reset', {
+            provider: provider.id,
+            stuckForMs: Date.now() - app.fetchStartedAt
+        });
     }
 
     if (typeof provider.isGeocodeBackoffActive === 'function' && provider.isGeocodeBackoffActive()) {
@@ -1245,6 +1257,7 @@ function fetch(provider, force, bypassFetchBackoff) {
     }
 
     app.fetchInProgress = true;
+    app.fetchStartedAt = Date.now();
     console.log('Fetching from ' + provider.name);
     appendDebugWeatherLog('fetch_start', {
         provider: provider.id,

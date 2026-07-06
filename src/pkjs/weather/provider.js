@@ -533,6 +533,12 @@ WeatherProvider.prototype.fetch = function(onSuccess, onFailure, force) {
         this.withCityName(lat, lon, (function(cityName, countryCode) {
             this.countryCode = countryCode;
             this.withSunEvents(lat, lon, (function(sunEvents) {
+                // At extreme latitudes sunrise/sunset can be invalid (polar day/night),
+                // yielding fewer than the 2 events the payload and the watch require.
+                if (!Array.isArray(sunEvents) || sunEvents.length < 2) {
+                    onFailure(failure('sun_events', 'insufficient_events'));
+                    return;
+                }
                 this.withProviderData(lat, lon, force, (function() {
                     var payload;
                     // if `this` (the provider) contains valid weather details,
