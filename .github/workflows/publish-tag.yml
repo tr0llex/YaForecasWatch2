@@ -1,0 +1,52 @@
+name: Publish Tagged Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up mise toolchain
+        uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
+        with:
+          install: true
+          cache: true
+
+      - name: Install Pebble SDK
+        run: scripts/ensure-pebble-sdk.sh
+
+      - name: Build production and debug PBWs
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          mise build release
+          cp build/ForecasWatch-dk.pbw "dist/YaForecasWatch2-v${version}.pbw"
+          mise build debug
+          cp build/ForecasWatch-dk.pbw "dist/YaForecasWatch2-debug-v${version}.pbw"
+
+      - name: Create GitHub release and upload PBWs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_NOTES: |
+            - Yandex Weather now supplies its own UV index and precipitation probability forecasts.
+            - Open-Meteo is now a separate selectable provider instead of an automatic supplement or fallback.
+            - Yandex Weather and Open-Meteo keep independent caches and never mix forecast data.
+            - Open-Meteo requests a rolling 48-hour forecast.
+            - Both providers refresh 120 minutes after success and retry 60 minutes after failure.
+        shell: bash
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.pbw \
+            --title "YaForecasWatch2 ${GITHUB_REF_NAME#v}" \
+            --notes "$RELEASE_NOTES" \
+            --verify-tag
