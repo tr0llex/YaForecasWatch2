@@ -31,9 +31,9 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           mkdir -p dist
           mise build release
-          cp build/ForecasWatch-dk.pbw "dist/YaForecasWatch2-v${version}.pbw"
+          cp build/YaForecasWatch2.pbw "dist/YaForecasWatch2-v${version}.pbw"
           mise build debug
-          cp build/ForecasWatch-dk.pbw "dist/YaForecasWatch2-debug-v${version}.pbw"
+          cp build/YaForecasWatch2-debug.pbw "dist/YaForecasWatch2-debug-v${version}.pbw"
 
       - name: Create GitHub release and upload PBWs
         env:
