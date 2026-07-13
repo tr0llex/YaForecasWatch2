@@ -12,13 +12,13 @@ This fork is published as **YaForecasWatch2**, a modified ForecasWatch2 build fo
 
 Changes relative to the original ForecasWatch2 watchface:
 
-- Added **Yandex Weather** as a third main weather provider.
-- Added **Open-Meteo supplements** for Yandex Weather rain probability and UV index graphs, because those fields are not available in the Yandex Weather Smart Home free tier.
-- Changed the Yandex Weather refresh interval to **120 minutes**, matching the free-tier daily request limit more closely.
+- Added **Yandex Weather** as a main weather provider, including native temperature, feels-like temperature, rain probability, and UV index forecasts.
+- Added **Open-Meteo** as a separate selectable weather provider rather than an automatic supplement or fallback.
+- Yandex Weather and Open-Meteo refresh **120 minutes after a successful fetch** and retry **60 minutes after a failed fetch**.
 - Added **two configurable holiday sets**, with support for US, Russia, Spain national holidays, and Spain national + Catalonia holidays.
 - Holiday data is fetched from **Nager.Date**, cached locally for 30 days, and sent to the watch as compact yearly bitsets so the calendar still works offline.
 - Overlapping holidays from two selected sets are shown with a **split-color date highlight** on color Pebble watches.
-- Added a separate **YaForecasWatch2-debug** build profile with copyable diagnostic logs in settings for weather fetches, Open-Meteo supplements, and Nager.Date holiday sync.
+- Added a separate **YaForecasWatch2-debug** build profile with copyable diagnostic logs in settings for weather fetches, provider caches, and Nager.Date holiday sync.
 - Added a unique app UUID/display name and source-code URL metadata for clean redistribution of this GPL-licensed modified version.
 - Added Pebble Time 2 / Emery layout fixes and screenshot/dev tooling improvements used while maintaining this fork.
 
@@ -46,7 +46,7 @@ Open source revival of the beloved ForecasWatch watchface. This includes support
 * Vibrate on disconnect
 * Quiet time indicator
 * Night shading
-* Multiple weather providers (Weather Underground*, OpenWeatherMap, Yandex Weather)
+* Multiple weather providers (Weather Underground*, OpenWeatherMap, Open-Meteo, Yandex Weather)
 * Current temperature
 * Temperature forecast (red line)
 * UV index forecast (yellow line)
@@ -67,11 +67,12 @@ ForecasWatch2 can fetch weather from:
 
 - Weather Underground
 - OpenWeatherMap
+- Open-Meteo
 - Yandex Weather
 
-Yandex Weather support is intended to work with the Yandex Weather Smart Home API tier. That tier provides current temperature, feels-like temperature, wind speed, weather conditions, and condition icons. It does not currently expose precipitation probability or UV index fields, so when Yandex Weather is selected ForecasWatch2 supplements only those graph series with Open-Meteo data for the same location.
+Yandex Weather supplies its own temperature, apparent temperature, precipitation probability, and UV index data. Open-Meteo is an independent provider choice and is never queried automatically while another provider is selected.
 
-This means the watchface can still show the normal temperature, rain probability, and UV index graphs while using Yandex Weather as the main provider.
+Both providers keep separate phone-side hourly caches. Open-Meteo requests a rolling 48-hour forecast; Yandex caches the hourly range returned by its API. If a selected provider is temporarily unavailable, the watchface may continue using that provider's matching cached forecast; it does not mix data from different providers.
 
 ## Holiday calendar
 

@@ -1,6 +1,7 @@
 
 var WundergroundProvider = require('./weather/wunderground.js');
 var OpenWeatherMapProvider = require('./weather/openweathermap.js')
+var OpenMeteoProvider = require('./weather/openmeteo.js');
 var YandexProvider = require('./weather/yandex.js');
 var WeatherProvider = require('./weather/provider.js');
 var createTelemetryClient = require('./telemetry.js');
@@ -53,8 +54,10 @@ var KEY_V1_34_0_WEEKEND_HOLIDAY_COLOR_MIGRATION = 'v1.34.0_weekend_holiday_color
 var KEY_UV_FIXTURE_CLEANUP = 'uv_fixture_cleanup_v1';
 var DEFAULT_WEATHER_REFRESH_MINUTES = 30;
 var YANDEX_WEATHER_REFRESH_MINUTES = 120;
+var OPEN_METEO_WEATHER_REFRESH_MINUTES = 120;
 var DEFAULT_FETCH_FAILURE_BACKOFF_MS = 5 * 60 * 1000;
 var YANDEX_FETCH_FAILURE_BACKOFF_MS = 60 * 60 * 1000;
+var OPEN_METEO_FETCH_FAILURE_BACKOFF_MS = 60 * 60 * 1000;
 var FETCH_WATCHDOG_MS = 2 * 60 * 1000;
 var DEFAULT_COLOR_WHITE = pebbleColors.GColorWhite;
 var DEFAULT_COLOR_FOLLY = pebbleColors.GColorFolly;
@@ -571,6 +574,9 @@ function getFailureBackoffMs(provider) {
     if (provider && provider.id === 'yandex') {
         return YANDEX_FETCH_FAILURE_BACKOFF_MS;
     }
+    if (provider && provider.id === 'openmeteo') {
+        return OPEN_METEO_FETCH_FAILURE_BACKOFF_MS;
+    }
 
     return DEFAULT_FETCH_FAILURE_BACKOFF_MS;
 }
@@ -738,7 +744,7 @@ function getDebugWeatherState(diagnostics) {
         return DEBUG_WEATHER_STATE_STALE_CACHE;
     }
 
-    if (source === 'openmeteo_fallback' || source === 'openmeteo_cache') {
+    if (source === 'openmeteo' || source === 'openmeteo_cache') {
         return DEBUG_WEATHER_STATE_OPENMETEO_TEMP;
     }
 
@@ -830,6 +836,9 @@ function setProvider(providerId) {
     switch (providerId) {
         case 'openweathermap':
             app.provider = new OpenWeatherMapProvider(app.settings.owmApiKey);
+            break;
+        case 'openmeteo':
+            app.provider = new OpenMeteoProvider();
             break;
         case 'yandex':
             app.provider = new YandexProvider(app.settings.yandexApiKey);
@@ -1388,6 +1397,9 @@ function tryFetch(provider) {
 function getRefreshMinutes(provider) {
     if (provider && provider.id === 'yandex') {
         return YANDEX_WEATHER_REFRESH_MINUTES;
+    }
+    if (provider && provider.id === 'openmeteo') {
+        return OPEN_METEO_WEATHER_REFRESH_MINUTES;
     }
 
     return DEFAULT_WEATHER_REFRESH_MINUTES;

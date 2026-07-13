@@ -248,7 +248,7 @@ var config = [
                 "label": "Show feels-like temperature",
                 "messageKey": "showFeelsLike",
                 "defaultValue": false,
-                "description": "Show Yandex Weather apparent temperature as dotted points on the temperature graph."
+                "description": "Show apparent temperature as dotted points when the selected provider supports it."
             },
             {
                 "type": "color",
@@ -270,6 +270,10 @@ var config = [
                     {
                         "label": "OpenWeatherMap",
                         "value": "openweathermap"
+                    },
+                    {
+                        "label": "Open-Meteo",
+                        "value": "openmeteo"
                     },
                     {
                         "label": "Yandex Weather",

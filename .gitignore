@@ -20,5 +20,6 @@ screenshot/out/**
 !.agents
 node_modules
 package.json
+Yandex Weather API key.txt
 !opencode.jsonc
 !AGENTS.md
