@@ -39,10 +39,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_NOTES: |
-            - The forecast graph now advances locally at every hour, including while cached weather data is displayed. This does not trigger extra API requests.
-            - Reverse-geocoding failures no longer block weather updates. A nearby cached place name is used when available; otherwise the watch displays `Unknown`.
-            - Debug logs retain more weather-fetch diagnostics by limiting repetitive holiday-cache entries.
-            - Debug and development builds include a distinct 25x25 launcher icon for the watch's watchface chooser.
+            - Yandex Weather and OpenWeatherMap API keys are now masked in the settings page by default.
+            - Each API-key field includes a Show/Hide button for intentional inspection and editing.
+            - Revealed keys are automatically masked again when switching to another weather provider.
+            - Disabled autocomplete, autocorrect, capitalization, and spellcheck for API-key fields.
         shell: bash
         run: |
           gh release create "$GITHUB_REF_NAME" dist/*.pbw \

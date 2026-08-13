@@ -44,6 +44,88 @@ module.exports = function (minified) {
         }).join('\n');
     }
 
+    /**
+     * Add a compact reveal control to a masked Clay input.
+     *
+     * @param {Object} clayItem Clay input item.
+     * @param {string} fieldName Human-readable field name for accessibility.
+     * @returns {void}
+     */
+    function addApiKeyRevealButton(clayItem, fieldName) {
+        var input = clayItem && clayItem.$manipulatorTarget
+            ? clayItem.$manipulatorTarget[0]
+            : null;
+        var wrapper = input && input.parentNode;
+        var button;
+
+        if (!input || !wrapper || wrapper.querySelector('.api-key-reveal')) {
+            return;
+        }
+
+        input.type = 'password';
+        input.style.paddingRight = '4.6rem';
+
+        button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'api-key-reveal';
+        button.textContent = 'Show';
+        button.setAttribute('aria-label', 'Show ' + fieldName);
+        button.setAttribute('aria-pressed', 'false');
+        button.style.position = 'absolute';
+        button.style.top = '0';
+        button.style.right = '0';
+        button.style.height = '100%';
+        button.style.minWidth = '4.1rem';
+        button.style.padding = '0 0.55rem';
+        button.style.border = '0';
+        button.style.borderLeft = '1px solid #5f6368';
+        button.style.borderRadius = '0 0.25rem 0.25rem 0';
+        button.style.background = '#444444';
+        button.style.color = '#ffffff';
+        button.style.fontSize = '0.85rem';
+
+        button.addEventListener('click', function(event) {
+            var reveal = input.type === 'password';
+
+            event.preventDefault();
+            event.stopPropagation();
+            input.type = reveal ? 'text' : 'password';
+            button.textContent = reveal ? 'Hide' : 'Show';
+            button.setAttribute('aria-label', (reveal ? 'Hide ' : 'Show ') + fieldName);
+            button.setAttribute('aria-pressed', reveal ? 'true' : 'false');
+            input.focus();
+        });
+
+        wrapper.appendChild(button);
+    }
+
+    /**
+     * Restore the masked presentation for an API-key field.
+     *
+     * @param {Object} clayItem Clay input item.
+     * @param {string} fieldName Human-readable field name for accessibility.
+     * @returns {void}
+     */
+    function maskApiKeyInput(clayItem, fieldName) {
+        var input = clayItem && clayItem.$manipulatorTarget
+            ? clayItem.$manipulatorTarget[0]
+            : null;
+        var button = input && input.parentNode
+            ? input.parentNode.querySelector('.api-key-reveal')
+            : null;
+
+        if (!input) {
+            return;
+        }
+
+        input.type = 'password';
+        if (button) {
+            button.textContent = 'Show';
+            button.setAttribute('aria-label', 'Show ' + fieldName);
+            button.setAttribute('aria-pressed', 'false');
+        }
+    }
+
     clayConfig.on(clayConfig.EVENTS.AFTER_BUILD, function() {
         var clayFetch;
         var clayOwmApiKey;
@@ -74,6 +156,8 @@ module.exports = function (minified) {
         clayYandexApiKey = clayConfig.getItemByMessageKey('yandexApiKey');
         clayProvider = clayConfig.getItemByMessageKey('provider');
         clayLocation = clayConfig.getItemByMessageKey('location');
+        addApiKeyRevealButton(clayOwmApiKey, 'OpenWeatherMap API key');
+        addApiKeyRevealButton(clayYandexApiKey, 'Yandex Weather API key');
         initProvider = clayProvider.get();
         initOwmApiKey = clayOwmApiKey.get();
         initYandexApiKey = clayYandexApiKey.get();
@@ -93,12 +177,14 @@ module.exports = function (minified) {
                 clayOwmApiKey.show();
             }
             else {
+                maskApiKeyInput(clayOwmApiKey, 'OpenWeatherMap API key');
                 clayOwmApiKey.hide();
             }
             if (this.get() === 'yandex') {
                 clayYandexApiKey.show();
             }
             else {
+                maskApiKeyInput(clayYandexApiKey, 'Yandex Weather API key');
                 clayYandexApiKey.hide();
             }
             console.log('Provider set to ' + this.get());

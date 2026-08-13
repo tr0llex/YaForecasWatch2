@@ -285,13 +285,27 @@ var config = [
                 "type": "input",
                 "label": "OpenWeatherMap API key",
                 "messageKey": "owmApiKey",
-                "description": "<a href='https://openweathermap.org/'>Register an OpenWeatherMap account</a> and paste your API key here"
+                "description": "<a href='https://openweathermap.org/'>Register an OpenWeatherMap account</a> and paste your API key here",
+                "attributes": {
+                    "type": "password",
+                    "autocomplete": "off",
+                    "autocapitalize": "none",
+                    "autocorrect": "off",
+                    "spellcheck": "false"
+                }
             },
             {
                 "type": "input",
                 "label": "Yandex Weather API key",
                 "messageKey": "yandexApiKey",
-                "description": "<a href='https://yandex.ru/pogoda/b2b/smarthome'>Get a Yandex Weather API key</a> and paste it here"
+                "description": "<a href='https://yandex.ru/pogoda/b2b/smarthome'>Get a Yandex Weather API key</a> and paste it here",
+                "attributes": {
+                    "type": "password",
+                    "autocomplete": "off",
+                    "autocapitalize": "none",
+                    "autocorrect": "off",
+                    "spellcheck": "false"
+                }
             },
             {
                 "type": "toggle",

@@ -1,4 +1,8 @@
 {
+  "1.34.13": {
+    "title": "API key privacy",
+    "body": "Weather API keys are now masked in settings by default. Use the Show button when you need to inspect or edit a key."
+  },
   "1.34.12": {
     "title": "Forecast timeline fix",
     "body": "The forecast graph now advances every hour even when cached data is displayed. Weather updates also continue when place-name lookup is unavailable."
