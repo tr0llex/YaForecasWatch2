@@ -1,4 +1,8 @@
 {
+  "1.34.12": {
+    "title": "Forecast timeline fix",
+    "body": "The forecast graph now advances every hour even when cached data is displayed. Weather updates also continue when place-name lookup is unavailable."
+  },
   "1.33.0": {
     "title": "New in v1.33.0!",
     "body": "Pebble Time 2 is now natively supported.\n\nEnjoy your favorite watchface, optimized for the larger display."

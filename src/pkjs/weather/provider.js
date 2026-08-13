@@ -5,6 +5,8 @@ var XHR_TIMEOUT_MS = 5000;
 var GPS_CACHE_KEY = 'gpsCache';
 var GPS_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 var GEOCODE_CACHE_KEY = storageKeys.GEOCODE_CACHE_KEY;
+var REVERSE_GEOCODE_CACHE_KEY = storageKeys.REVERSE_GEOCODE_CACHE_KEY;
+var REVERSE_GEOCODE_CACHE_MATCH_KM = 25;
 var RATE_LIMIT_BACKOFF_KEY = storageKeys.GEOCODE_BACKOFF_KEY;
 
 /**
@@ -144,6 +146,90 @@ function writeGeocodeCache(location, lat, lon) {
 }
 
 /**
+ * Convert a coordinate-like value to a finite number.
+ *
+ * @param {*} value Candidate coordinate.
+ * @returns {number|null} Finite number or null.
+ */
+function finiteCoordinate(value) {
+    var numeric = typeof value === 'number' ? value : parseFloat(value);
+
+    return isFinite(numeric) ? numeric : null;
+}
+
+/**
+ * Calculate the distance between two coordinates in kilometres.
+ *
+ * @param {number} lat1 First latitude.
+ * @param {number} lon1 First longitude.
+ * @param {number} lat2 Second latitude.
+ * @param {number} lon2 Second longitude.
+ * @returns {number} Great-circle distance in kilometres.
+ */
+function coordinateDistanceKm(lat1, lon1, lat2, lon2) {
+    var earthRadiusKm = 6371;
+    var toRadians = Math.PI / 180;
+    var deltaLat = (lat2 - lat1) * toRadians;
+    var deltaLon = (lon2 - lon1) * toRadians;
+    var a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2)
+        + Math.cos(lat1 * toRadians) * Math.cos(lat2 * toRadians)
+        * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+
+    return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Read a cached place label when it belongs to the current coordinates.
+ *
+ * @param {number|string} lat Current latitude.
+ * @param {number|string} lon Current longitude.
+ * @returns {{cityName: string, countryCode: string|null, fetchedAtUtc: string}|null} Cached label.
+ */
+function readReverseGeocodeCache(lat, lon) {
+    var cached = readStoredJson(REVERSE_GEOCODE_CACHE_KEY);
+    var currentLat = finiteCoordinate(lat);
+    var currentLon = finiteCoordinate(lon);
+    var cachedLat = cached ? finiteCoordinate(cached.lat) : null;
+    var cachedLon = cached ? finiteCoordinate(cached.lon) : null;
+
+    if (!cached || currentLat === null || currentLon === null
+        || cachedLat === null || cachedLon === null
+        || typeof cached.cityName !== 'string' || cached.cityName.length === 0) {
+        return null;
+    }
+
+    if (coordinateDistanceKm(currentLat, currentLon, cachedLat, cachedLon)
+        > REVERSE_GEOCODE_CACHE_MATCH_KM) {
+        return null;
+    }
+
+    return {
+        cityName: cached.cityName,
+        countryCode: typeof cached.countryCode === 'string' ? cached.countryCode : null,
+        fetchedAtUtc: typeof cached.fetchedAtUtc === 'string' ? cached.fetchedAtUtc : null
+    };
+}
+
+/**
+ * Persist a successful reverse-geocode place label.
+ *
+ * @param {number|string} lat Latitude.
+ * @param {number|string} lon Longitude.
+ * @param {string} cityName Place label.
+ * @param {string|null} countryCode Country code.
+ * @returns {void}
+ */
+function writeReverseGeocodeCache(lat, lon, cityName, countryCode) {
+    localStorage.setItem(REVERSE_GEOCODE_CACHE_KEY, JSON.stringify({
+        lat: finiteCoordinate(lat),
+        lon: finiteCoordinate(lon),
+        cityName: cityName,
+        countryCode: countryCode,
+        fetchedAtUtc: new Date().toISOString()
+    }));
+}
+
+/**
  * Record a LocationIQ 429 backoff window.
  *
  * @returns {number} Backoff duration in milliseconds.
@@ -260,10 +346,34 @@ WeatherProvider.prototype.withSunEvents = function(lat, lon, callback, onFailure
     callback(next24HourSunEvents);
 };
 
-WeatherProvider.prototype.withCityName = function(lat, lon, callback, onFailure) {
+WeatherProvider.prototype.withCityName = function(lat, lon, callback) {
     // callback(cityName, countryCode)
+    var provider = this;
     var url = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?f=json&langCode=EN&location='
         + lon + ',' + lat;
+    var handleFailure = function(error) {
+        var cached = readReverseGeocodeCache(lat, lon);
+
+        console.log('[!] Reverse geocode failed: ' + JSON.stringify(error));
+        provider.warnings.push(failure('reverse_geocode', error.code));
+        if (cached) {
+            provider.warnings.push(failure('reverse_geocode', 'cached_fallback'));
+            provider.diagnostics.reverseGeocode = {
+                status: 'cached',
+                error: error.code,
+                fetchedAtUtc: cached.fetchedAtUtc
+            };
+            callback(cached.cityName, cached.countryCode);
+            return;
+        }
+
+        provider.warnings.push(failure('reverse_geocode', 'unknown_fallback'));
+        provider.diagnostics.reverseGeocode = {
+            status: 'unknown',
+            error: error.code
+        };
+        callback('Unknown', null);
+    };
 
     request(
         url,
@@ -277,20 +387,21 @@ WeatherProvider.prototype.withCityName = function(lat, lon, callback, onFailure)
                 body = JSON.parse(response);
             }
             catch (ex) {
-                onFailure(failure('reverse_geocode', 'parse_error'));
+                handleFailure({ code: 'parse_error' });
                 return;
             }
 
             address = body.address || {};
             name = address.District || address.City || address.Region || 'Unknown';
             countryCode = address.CountryCode || null;
+            writeReverseGeocodeCache(lat, lon, name, countryCode);
+            provider.diagnostics.reverseGeocode = {
+                status: 'success'
+            };
             console.log('Running callback with city: ' + name + ', countryCode=' + countryCode);
             callback(name, countryCode);
         },
-        function(error) {
-            console.log('[!] Reverse geocode failed: ' + JSON.stringify(error));
-            onFailure(failure('reverse_geocode', error.code));
-        }
+        handleFailure
     );
 };
 

@@ -49,6 +49,7 @@ var KEY_LAST_FETCH_SUCCESS = storageKeys.LAST_FETCH_SUCCESS_KEY;
 var KEY_LAST_FETCH_ATTEMPT = storageKeys.LAST_FETCH_ATTEMPT_KEY;
 var KEY_DEBUG_WEATHER_LOG = storageKeys.DEBUG_WEATHER_LOG_KEY;
 var KEY_GEOCODE_CACHE = storageKeys.GEOCODE_CACHE_KEY;
+var KEY_REVERSE_GEOCODE_CACHE = storageKeys.REVERSE_GEOCODE_CACHE_KEY;
 var KEY_GEOCODE_BACKOFF = storageKeys.GEOCODE_BACKOFF_KEY;
 var KEY_V1_34_0_WEEKEND_HOLIDAY_COLOR_MIGRATION = 'v1.34.0_weekend_holiday_color_migration';
 var KEY_UV_FIXTURE_CLEANUP = 'uv_fixture_cleanup_v1';
@@ -68,10 +69,61 @@ var DEBUG_WEATHER_STATE_NORMAL = 0;
 var DEBUG_WEATHER_STATE_OPENMETEO_TEMP = 1;
 var DEBUG_WEATHER_STATE_STALE_CACHE = 2;
 var DEBUG_STALE_CACHE_MS = 4 * 60 * 60 * 1000;
+var DEBUG_LOG_MAX_ENTRIES = 50;
+var DEBUG_LOG_MAX_BYTES = 8192;
+var DEBUG_LOG_MAX_HOLIDAY_ENTRIES = 20;
 
 app.fetchInProgress = false;
 app.fetchStartedAt = 0;
 app.pendingStartupFetch = false;
+
+/**
+ * Return true when a debug entry belongs to holiday synchronization.
+ *
+ * @param {Object} entry Debug log entry.
+ * @returns {boolean} True for holiday events.
+ */
+function isHolidayDebugEntry(entry) {
+    return Boolean(entry && typeof entry.event === 'string'
+        && entry.event.indexOf('holiday_') === 0);
+}
+
+/**
+ * Remove the oldest holiday entry from a debug log.
+ *
+ * @param {Object[]} entries Debug log entries.
+ * @returns {boolean} True when an entry was removed.
+ */
+function removeOldestHolidayDebugEntry(entries) {
+    var index;
+
+    for (index = 0; index < entries.length; index += 1) {
+        if (isHolidayDebugEntry(entries[index])) {
+            entries.splice(index, 1);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Count holiday synchronization entries in a debug log.
+ *
+ * @param {Object[]} entries Debug log entries.
+ * @returns {number} Holiday entry count.
+ */
+function countHolidayDebugEntries(entries) {
+    var count = 0;
+
+    entries.forEach(function(entry) {
+        if (isHolidayDebugEntry(entry)) {
+            count += 1;
+        }
+    });
+
+    return count;
+}
 
 Pebble.addEventListener('appmessage', function(e) {
     var payload = e && e.payload;
@@ -637,13 +689,19 @@ function appendDebugWeatherLog(event, details) {
         details: details || {}
     });
 
-    while (entries.length > 50) {
+    while (countHolidayDebugEntries(entries) > DEBUG_LOG_MAX_HOLIDAY_ENTRIES) {
+        removeOldestHolidayDebugEntry(entries);
+    }
+
+    while (entries.length > DEBUG_LOG_MAX_ENTRIES) {
         entries.shift();
     }
 
     raw = JSON.stringify(entries);
-    while (raw.length > 8192 && entries.length > 1) {
-        entries.shift();
+    while (raw.length > DEBUG_LOG_MAX_BYTES && entries.length > 1) {
+        if (!removeOldestHolidayDebugEntry(entries)) {
+            entries.shift();
+        }
         raw = JSON.stringify(entries);
     }
 
@@ -828,6 +886,7 @@ function refreshProvider() {
     // Clear geocode cache when location changes so a fresh lookup always happens
     if (oldLocation !== app.provider.location) {
         localStorage.removeItem(KEY_GEOCODE_CACHE);
+        localStorage.removeItem(KEY_REVERSE_GEOCODE_CACHE);
         localStorage.removeItem(KEY_GEOCODE_BACKOFF);
     }
 }

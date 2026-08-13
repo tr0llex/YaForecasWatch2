@@ -1,7 +1,7 @@
 {
   "name": "yaforecaswatch2",
   "author": "Dmitry Kvasnikov",
-  "version": "1.34.11",
+  "version": "1.34.12",
   "buildProfile": "{{buildProfile}}",
   "keywords": [
     "pebble-app"
@@ -37,7 +37,7 @@
           "menuIcon": true,
           "type": "png",
           "name": "IMAGE_MENU_ICON",
-          "file": "icon.png"
+          "file": "{{menuIcon}}"
         },
         {
           "type": "bitmap",

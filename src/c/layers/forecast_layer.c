@@ -3,6 +3,7 @@
 #include "c/appendix/math.h"
 #include "c/appendix/config.h"
 #include "c/appendix/memory_log.h"
+#include "c/services/watch_services.h"
 
 #define LEFT_AXIS_LABEL_STRIP_MIN_W 15
 #define LEFT_AXIS_LABEL_TO_GRAPH_GAP 2
@@ -91,6 +92,20 @@ static GPath s_path_uv;
 static bool is_feels_like_available(int16_t temp)
 {
     return temp != FEELS_LIKE_UNAVAILABLE;
+}
+
+static int forecast_visible_offset(time_t forecast_start, int num_entries)
+{
+    const time_t now = watch_services_now();
+
+    if (num_entries < 2 || now <= forecast_start)
+    {
+        return 0;
+    }
+
+    int offset = (int)((now - forecast_start) / FORECAST_STEP_SECONDS);
+    const int max_offset = num_entries - 2;
+    return offset < max_offset ? offset : max_offset;
 }
 
 static RenderSpec make_render_spec()
@@ -523,9 +538,9 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
 
     // Load data from storage
     const int raw_num_entries = persist_get_num_entries();
-    const int num_entries = raw_num_entries > MAX_FORECAST_ENTRIES ? MAX_FORECAST_ENTRIES : raw_num_entries;
+    const int stored_num_entries = raw_num_entries > MAX_FORECAST_ENTRIES ? MAX_FORECAST_ENTRIES : raw_num_entries;
     MemoryHeapProbe redraw_probe = MEMORY_HEAP_PROBE_START("forecast_update");
-    if (num_entries < 2)
+    if (stored_num_entries < 2)
     {
         graphics_context_set_fill_color(ctx, GColorBlack);
         graphics_fill_rect(ctx, bounds, 0, GCornerNone);
@@ -533,7 +548,10 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
         return;
     }
 
-    const time_t forecast_start = persist_get_forecast_start();
+    const time_t stored_forecast_start = persist_get_forecast_start();
+    const int data_offset = forecast_visible_offset(stored_forecast_start, stored_num_entries);
+    const int num_entries = stored_num_entries - data_offset;
+    const time_t forecast_start = stored_forecast_start + data_offset * FORECAST_STEP_SECONDS;
     const time_t forecast_end = forecast_start + (num_entries - 1) * FORECAST_STEP_SECONDS;
     NightSegments night_segments = {0};
     struct tm *forecast_start_local = localtime(&forecast_start);
@@ -543,19 +561,19 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
     uint8_t uv_indices[MAX_FORECAST_ENTRIES];
     memset(feels_like_temps, FEELS_LIKE_UNAVAILABLE, sizeof(feels_like_temps));
     memset(uv_indices, UV_INDEX_UNAVAILABLE, sizeof(uv_indices));
-    persist_get_temp_trend(temps, num_entries);
-    persist_get_feels_like_trend(feels_like_temps, num_entries);
-    persist_get_precip_trend(precips, num_entries);
-    persist_get_uv_trend(uv_indices, num_entries);
+    persist_get_temp_trend(temps, stored_num_entries);
+    persist_get_feels_like_trend(feels_like_temps, stored_num_entries);
+    persist_get_precip_trend(precips, stored_num_entries);
+    persist_get_uv_trend(uv_indices, stored_num_entries);
 
     // Allocate point arrays for plots
     // Calculate the temperature range
     int lo, hi;
-    min_max(temps, num_entries, &lo, &hi);
+    min_max(temps + data_offset, num_entries, &lo, &hi);
     bool has_feels_like_data = false;
     if (g_config->show_feels_like)
     {
-        for (int i = 0; i < num_entries; ++i)
+        for (int i = data_offset; i < stored_num_entries; ++i)
         {
             if (is_feels_like_available(feels_like_temps[i]))
             {
@@ -595,15 +613,16 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
     const int entries_per_label = ((HOUR_LABEL_MIN_SPACING - 1) * span + graph_w) / graph_w;
     for (int i = 0; i < num_entries; ++i)
     {
+        const int data_i = i + data_offset;
         int entry_x = graph_bounds.origin.x + i * graph_w / span;
 
         // Save a point for the precipitation probability
-        int precip = precips[i];
+        int precip = precips[data_i];
         int precip_h = precip * (h - BOTTOM_AXIS_H) / 100;
         s_points_precip[i] = GPoint(entry_x, h - BOTTOM_AXIS_H - precip_h);
 
         // Save a point for the temperature reading
-        int temp = temps[i];
+        int temp = temps[data_i];
         int temp_h = temp_plot_h / 2;
         if (range > 0)
         {
@@ -611,17 +630,17 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
         }
         s_points_temp[i] = GPoint(entry_x, h - temp_h - MARGIN_TEMP_H - BOTTOM_AXIS_H);
 
-        if (has_feels_like_data && is_feels_like_available(feels_like_temps[i]))
+        if (has_feels_like_data && is_feels_like_available(feels_like_temps[data_i]))
         {
             int feels_like_h = temp_plot_h / 2;
             if (range > 0)
             {
-                feels_like_h = (int)(((int32_t)(feels_like_temps[i] - lo) * temp_plot_h) / range_safe);
+                feels_like_h = (int)(((int32_t)(feels_like_temps[data_i] - lo) * temp_plot_h) / range_safe);
             }
             s_points_feels_like[i] = GPoint(entry_x, h - feels_like_h - MARGIN_TEMP_H - BOTTOM_AXIS_H);
         }
 
-        int uv_index = uv_indices[i];
+        int uv_index = uv_indices[data_i];
         if (uv_index != UV_INDEX_UNAVAILABLE)
         {
             has_uv_data = true;
@@ -747,7 +766,7 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
         graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(g_config->color_feels_like, GColorWhite));
         for (int i = 0; i < num_entries; ++i)
         {
-            if (is_feels_like_available(feels_like_temps[i]))
+            if (is_feels_like_available(feels_like_temps[i + data_offset]))
             {
                 graphics_fill_circle(ctx, s_points_feels_like[i], FEELS_LIKE_DOT_RADIUS);
             }
@@ -809,22 +828,33 @@ static GSize temp_label_string_size(const char *text)
 
 static void text_labels_refresh()
 {
+    const int raw_num_entries = persist_get_num_entries();
+    int stored_num_entries = raw_num_entries > MAX_FORECAST_ENTRIES ? MAX_FORECAST_ENTRIES : raw_num_entries;
     int lo = persist_get_temp_lo();
     int hi = persist_get_temp_hi();
+    int data_offset = 0;
+    int16_t temps[MAX_FORECAST_ENTRIES];
+    int16_t feels_like_temps[MAX_FORECAST_ENTRIES];
+
+    if (stored_num_entries < 0)
+    {
+        stored_num_entries = 0;
+    }
+
+    memset(temps, 0, sizeof(temps));
+    memset(feels_like_temps, FEELS_LIKE_UNAVAILABLE, sizeof(feels_like_temps));
+    if (stored_num_entries >= 2)
+    {
+        data_offset = forecast_visible_offset(persist_get_forecast_start(), stored_num_entries);
+        persist_get_temp_trend(temps, stored_num_entries);
+        min_max(temps + data_offset, stored_num_entries - data_offset, &lo, &hi);
+    }
 
     if (g_config->show_feels_like)
     {
-        const int raw_num_entries = persist_get_num_entries();
-        int num_entries = raw_num_entries > MAX_FORECAST_ENTRIES ? MAX_FORECAST_ENTRIES : raw_num_entries;
-        int16_t feels_like_temps[MAX_FORECAST_ENTRIES];
-        if (num_entries < 0)
-        {
-            num_entries = 0;
-        }
-        memset(feels_like_temps, FEELS_LIKE_UNAVAILABLE, sizeof(feels_like_temps));
-        persist_get_feels_like_trend(feels_like_temps, num_entries);
+        persist_get_feels_like_trend(feels_like_temps, stored_num_entries);
 
-        for (int i = 0; i < num_entries; ++i)
+        for (int i = data_offset; i < stored_num_entries; ++i)
         {
             if (is_feels_like_available(feels_like_temps[i]))
             {
