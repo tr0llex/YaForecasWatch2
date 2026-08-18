@@ -39,10 +39,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_NOTES: |
-            - Yandex Weather and OpenWeatherMap API keys are now masked in the settings page by default.
-            - Each API-key field includes a Show/Hide button for intentional inspection and editing.
-            - Revealed keys are automatically masked again when switching to another weather provider.
-            - Disabled autocomplete, autocorrect, capitalization, and spellcheck for API-key fields.
+            - Weather now refreshes automatically after travel once the phone remains near the new location for about 10 minutes.
+            - Yandex cooldown handling no longer retries cached fallback data every minute or extends the original retry deadline.
+            - The debug build records travel detection, stationary-state, and arrival-refresh events for troubleshooting.
+            - Removed the in-watch "What's new" notification shown after app updates.
         shell: bash
         run: |
           gh release create "$GITHUB_REF_NAME" dist/*.pbw \

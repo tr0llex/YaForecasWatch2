@@ -13,22 +13,7 @@ var pkg = require('../../package.json');
 var activeFixture = require('./active-fixture.generated.js');
 var pebbleColors = require('./pebble-colors.js');
 var holidays = require('./holidays.js');
-
-/**
- * Full release-notification manifest (dev: force-show by version). Omitted from bundle if missing.
- *
- * @returns {Object|null} Parsed release-notifications.json or null.
- */
-function loadReleaseNotificationsManifest() {
-    try {
-        return require('../../release-notifications.json');
-    }
-    catch (ex) {
-        return null;
-    }
-}
-
-var releaseNotificationsManifest = loadReleaseNotificationsManifest();
+var travelMonitor = require('./travel-monitor.js');
 var clay = new Clay(clayConfig, customClay, { autoHandleEvents: false });
 /**
  * @type {{
@@ -38,15 +23,18 @@ var clay = new Clay(clayConfig, customClay, { autoHandleEvents: false });
  *     telemetry?: Object,
  *     provider?: Object,
  *     watchInfo?: Object,
- *     devConfig?: Object
+ *     devConfig?: Object,
+ *     travelLocationInProgress: boolean
  * }}
  */
 var app = {};  // Namespace for global app variables
-var KEY_MAX_NOTIFIED_VERSION = 'max_notified_version';
 var KEY_FETCH_ATTEMPT = storageKeys.FETCH_ATTEMPT_KEY;
 var KEY_FETCH_BACKOFF = storageKeys.FETCH_BACKOFF_KEY;
+var KEY_FETCH_BACKOFF_FALLBACK = storageKeys.FETCH_BACKOFF_FALLBACK_KEY;
 var KEY_LAST_FETCH_SUCCESS = storageKeys.LAST_FETCH_SUCCESS_KEY;
 var KEY_LAST_FETCH_ATTEMPT = storageKeys.LAST_FETCH_ATTEMPT_KEY;
+var KEY_LAST_WEATHER_COORDINATES = storageKeys.LAST_WEATHER_COORDINATES_KEY;
+var KEY_TRAVEL_MONITOR_STATE = storageKeys.TRAVEL_MONITOR_STATE_KEY;
 var KEY_DEBUG_WEATHER_LOG = storageKeys.DEBUG_WEATHER_LOG_KEY;
 var KEY_GEOCODE_CACHE = storageKeys.GEOCODE_CACHE_KEY;
 var KEY_REVERSE_GEOCODE_CACHE = storageKeys.REVERSE_GEOCODE_CACHE_KEY;
@@ -59,6 +47,7 @@ var OPEN_METEO_WEATHER_REFRESH_MINUTES = 120;
 var DEFAULT_FETCH_FAILURE_BACKOFF_MS = 5 * 60 * 1000;
 var YANDEX_FETCH_FAILURE_BACKOFF_MS = 60 * 60 * 1000;
 var OPEN_METEO_FETCH_FAILURE_BACKOFF_MS = 60 * 60 * 1000;
+var BACKOFF_FALLBACK_INTERVAL_MS = 60 * 60 * 1000;
 var FETCH_WATCHDOG_MS = 2 * 60 * 1000;
 var DEFAULT_COLOR_WHITE = pebbleColors.GColorWhite;
 var DEFAULT_COLOR_FOLLY = pebbleColors.GColorFolly;
@@ -76,6 +65,7 @@ var DEBUG_LOG_MAX_HOLIDAY_ENTRIES = 20;
 app.fetchInProgress = false;
 app.fetchStartedAt = 0;
 app.pendingStartupFetch = false;
+app.travelLocationInProgress = false;
 
 /**
  * Return true when a debug entry belongs to holiday synchronization.
@@ -185,11 +175,6 @@ Pebble.addEventListener('ready',
 
         app.devConfig = getDevConfig();
         maybeHandleDevStorageReset(app.devConfig);
-        var hadExistingInstall = localStorage.getItem('clay-settings') !== null;
-        maybeShowReleaseNotification(
-            hadExistingInstall,
-            app.devConfig.forceShowReleaseNotificationOnBoot
-        );
         clayTryDefaults();
         migratedWeekendHolidayColors = clayTryWeekendHolidayColorMigration();
         clayTryDevConfig(app.devConfig);
@@ -252,240 +237,6 @@ function getRuntimeTelemetryConfig() {
 }
 
 /**
- * Parse a semver-like string into numeric major/minor/patch parts.
- *
- * @param {string} v Version string such as "1.25.0" or "v1.25.0-beta+build".
- * @returns {number[]} Tuple-like array: [major, minor, patch].
- */
-function parseSemver(v) {
-    var core = String(v || '0.0.0').replace(/^v/, '').split('-')[0].split('+')[0];
-    var p = core.split('.');
-    return [
-        parseInt(p[0], 10) || 0,
-        parseInt(p[1], 10) || 0,
-        parseInt(p[2], 10) || 0
-    ];
-}
-
-/**
- * Compare two semver-like version strings.
- *
- * @param {string} a Left-hand version.
- * @param {string} b Right-hand version.
- * @returns {number} 1 when a>b, -1 when a<b, 0 when equal.
- */
-function compareSemver(a, b) {
-    var pa = parseSemver(a);
-    var pb = parseSemver(b);
-    if (pa[0] !== pb[0]) return pa[0] > pb[0] ? 1 : -1;
-    if (pa[1] !== pb[1]) return pa[1] > pb[1] ? 1 : -1;
-    if (pa[2] !== pb[2]) return pa[2] > pb[2] ? 1 : -1;
-    return 0;
-}
-
-/**
- * Normalize a release notification entry into title/body or null.
- *
- * @param {*} releaseNotification Field from package.json.
- * @returns {{title: string, body: string}|null} Payload or null when disabled/empty.
- */
-function normalizeReleaseNotificationPayload(releaseNotification) {
-    if (!releaseNotification || typeof releaseNotification !== 'object' || Array.isArray(releaseNotification)) {
-        return null;
-    }
-    var title = releaseNotification.title ? String(releaseNotification.title).trim() : '';
-    var body = releaseNotification.body ? String(releaseNotification.body).trim() : '';
-    if (title === '' || body === '') {
-        return null;
-    }
-    return { title: title, body: body };
-}
-
-/**
- * Normalize bundled pkg.releaseNotification into title/body or null.
- *
- * @param {Object|undefined} releaseNotification Field from package.json.
- * @returns {{title: string, body: string}|null} Payload or null when disabled/empty.
- */
-function getBundledReleaseNotificationPayload(releaseNotification) {
-    if (
-        !releaseNotification ||
-        releaseNotification.enabled !== true
-    ) {
-        return null;
-    }
-    return normalizeReleaseNotificationPayload(releaseNotification);
-}
-
-/**
- * Read package.json releaseNotifications, with legacy releaseNotification fallback.
- *
- * @returns {Object} Version-keyed release notification payloads.
- */
-function getBundledReleaseNotifications() {
-    var notifications = {};
-    var bundled = pkg.releaseNotifications;
-    var versionKey;
-    var payload;
-
-    if (bundled && typeof bundled === 'object' && !Array.isArray(bundled)) {
-        for (versionKey in bundled) {
-            if (Object.prototype.hasOwnProperty.call(bundled, versionKey)) {
-                payload = normalizeReleaseNotificationPayload(bundled[versionKey]);
-                if (payload !== null) {
-                    notifications[versionKey] = payload;
-                }
-            }
-        }
-    }
-
-    payload = getBundledReleaseNotificationPayload(pkg.releaseNotification);
-    if (payload !== null && typeof pkg.version === 'string') {
-        notifications[pkg.version] = payload;
-    }
-
-    return notifications;
-}
-
-/**
- * Find the newest bundled release notification that has not been shown yet.
- *
- * @param {string} maxNotified Highest notification version already shown.
- * @param {string} appVersion Running app version.
- * @returns {{version: string, title: string, body: string}|null} Latest unseen payload, or null.
- */
-function getLatestUnseenReleaseNotification(maxNotified, appVersion) {
-    var notifications = getBundledReleaseNotifications();
-    var versions = Object.keys(notifications).filter(function(versionKey) {
-        return (
-            compareSemver(versionKey, maxNotified) > 0 &&
-            compareSemver(versionKey, appVersion) <= 0
-        );
-    }).sort(compareSemver);
-    var latestVersion;
-    var payload;
-
-    if (versions.length === 0) {
-        return null;
-    }
-
-    latestVersion = versions[versions.length - 1];
-    payload = notifications[latestVersion];
-    return {
-        version: latestVersion,
-        title: payload.title,
-        body: payload.body
-    };
-}
-
-/**
- * Look up a release notification in release-notifications.json (dev force-show).
- *
- * @param {string} versionKey Exact version key, e.g. "1.26.0".
- * @returns {{title: string, body: string}|null} Payload or null when missing/invalid.
- */
-function getReleaseNotificationFromManifest(versionKey) {
-    var manifest = releaseNotificationsManifest;
-    if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
-        return null;
-    }
-    var entry = Object.prototype.hasOwnProperty.call(manifest, versionKey)
-        ? manifest[versionKey]
-        : undefined;
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-        return null;
-    }
-    var title = entry.title ? String(entry.title).trim() : '';
-    var body = entry.body ? String(entry.body).trim() : '';
-    if (title === '' || body === '') {
-        return null;
-    }
-    return { title: title, body: body };
-}
-
-/**
- * Parse dev-config force-show value: non-empty string = manifest version key.
- *
- * @param {*} forceVersionSpec From dev-config.forceShowReleaseNotificationOnBoot.
- * @returns {string} Trimmed version key or '' when disabled.
- */
-function normalizeForceReleaseVersionSpec(forceVersionSpec) {
-    if (typeof forceVersionSpec !== 'string') {
-        return '';
-    }
-    return forceVersionSpec.trim();
-}
-
-/**
- * Show the release notification exactly once for eligible upgrades, or every boot when dev forces a manifest version.
- *
- * @param {boolean} hadExistingInstall True when this launch is not first install.
- * @param {*} forceVersionSpec Dev: exact version key in release-notifications.json (e.g. "1.26.0"), or falsy.
- * @returns {void}
- */
-function maybeShowReleaseNotification(hadExistingInstall, forceVersionSpec) {
-    var appVersion = pkg.version;
-    var forceKey = normalizeForceReleaseVersionSpec(forceVersionSpec);
-    var forcePayload = forceKey !== '' ? getReleaseNotificationFromManifest(forceKey) : null;
-    if (forceKey !== '' && !forcePayload) {
-        console.log(
-            '[release-notification] force version ' + JSON.stringify(forceKey) +
-            ' not found or invalid in release-notifications.json'
-        );
-    }
-
-    var maxNotified = localStorage.getItem(KEY_MAX_NOTIFIED_VERSION) || '0.0.0';
-    var unseenNotification = getLatestUnseenReleaseNotification(maxNotified, appVersion);
-    var isNewer = compareSemver(appVersion, maxNotified) > 0;
-    var shouldNotifyUpgrade = hadExistingInstall && isNewer && unseenNotification !== null;
-    var shouldNotifyForce = forcePayload !== null;
-    var shouldNotify = shouldNotifyUpgrade || shouldNotifyForce;
-    var title = '';
-    var body = '';
-    if (shouldNotifyForce) {
-        title = forcePayload.title;
-        body = forcePayload.body;
-    }
-    else if (shouldNotifyUpgrade) {
-        title = unseenNotification.title;
-        body = unseenNotification.body;
-    }
-
-    console.log(
-        '[release-notification] appVersion=' + appVersion +
-        ' hadExistingInstall=' + hadExistingInstall +
-        ' maxNotified=' + maxNotified +
-        ' isNewer=' + isNewer +
-        ' forceVersionKey=' + (forceKey !== '' ? forceKey : '(none)') +
-        ' shouldNotify=' + shouldNotify +
-        ' shouldNotifyUpgrade=' + shouldNotifyUpgrade +
-        ' shouldNotifyForce=' + shouldNotifyForce +
-        ' unseenVersion=' + (unseenNotification ? unseenNotification.version : '(none)')
-    );
-
-    if (!shouldNotify) {
-        console.log('[release-notification] skip');
-    }
-
-    if (shouldNotify) {
-        console.log('[release-notification] showing notification');
-        Pebble.showSimpleNotificationOnPebble(title, body);
-    }
-
-    if (shouldNotifyUpgrade) {
-        localStorage.setItem(KEY_MAX_NOTIFIED_VERSION, unseenNotification.version);
-        console.log('[release-notification] set max_notified_version=' + unseenNotification.version);
-    }
-    else if (!hadExistingInstall && isNewer) {
-        localStorage.setItem(KEY_MAX_NOTIFIED_VERSION, appVersion);
-        console.log('[release-notification] first install, set max_notified_version=' + appVersion);
-    }
-    else {
-        console.log('[release-notification] keep max_notified_version=' + maxNotified);
-    }
-}
-
-/**
  * Optionally edit PKJS localStorage on boot when enabled in dev-config.js.
  *
  * @param {Object} devConfig Developer configuration object.
@@ -497,19 +248,10 @@ function maybeHandleDevStorageReset(devConfig) {
         devConfig &&
         devConfig.resetV134WeekendHolidayColorMigration
     );
-    var forcedMaxNotifiedVersion = devConfig &&
-        typeof devConfig.maxNotifiedVersion === 'string'
-        ? devConfig.maxNotifiedVersion.trim()
-        : '';
 
     if (shouldClear) {
         console.log('[dev] clearPkjsStorageOnBoot=true, clearing localStorage');
         localStorage.clear();
-    }
-
-    if (forcedMaxNotifiedVersion !== '') {
-        console.log('[dev] maxNotifiedVersion=' + forcedMaxNotifiedVersion + ', setting release notification marker');
-        localStorage.setItem(KEY_MAX_NOTIFIED_VERSION, forcedMaxNotifiedVersion);
     }
 
     if (shouldResetV134WeekendHolidayColorMigration) {
@@ -614,6 +356,56 @@ function clearFetchBackoff(providerId) {
         delete backoffMap[providerId];
         localStorage.setItem(KEY_FETCH_BACKOFF, JSON.stringify(backoffMap));
     }
+}
+
+/**
+ * Read timestamps of cache-only attempts made during provider cooldowns.
+ *
+ * @returns {Object} Provider-to-timestamp map.
+ */
+function readBackoffFallbackMap() {
+    var raw = localStorage.getItem(KEY_FETCH_BACKOFF_FALLBACK);
+    var parsed;
+
+    if (raw === null) {
+        return {};
+    }
+
+    try {
+        parsed = JSON.parse(raw);
+    }
+    catch (ex) {
+        localStorage.removeItem(KEY_FETCH_BACKOFF_FALLBACK);
+        return {};
+    }
+
+    return parsed && typeof parsed === 'object' ? parsed : {};
+}
+
+/**
+ * Record a cache-only attempt so the one-minute scheduler cannot repeat it.
+ *
+ * @param {string} providerId Weather provider id.
+ * @returns {void}
+ */
+function markBackoffFallbackAttempt(providerId) {
+    var fallbackMap = readBackoffFallbackMap();
+
+    fallbackMap[providerId] = Date.now();
+    localStorage.setItem(KEY_FETCH_BACKOFF_FALLBACK, JSON.stringify(fallbackMap));
+}
+
+/**
+ * Return whether cached data may be re-aligned during an active cooldown.
+ *
+ * @param {string} providerId Weather provider id.
+ * @returns {boolean} True at most once per hour.
+ */
+function canAttemptBackoffFallback(providerId) {
+    var fallbackMap = readBackoffFallbackMap();
+    var lastAttempt = Number(fallbackMap[providerId]);
+
+    return !isFinite(lastAttempt) || Date.now() - lastAttempt >= BACKOFF_FALLBACK_INTERVAL_MS;
 }
 
 /**
@@ -809,9 +601,217 @@ function getDebugWeatherState(diagnostics) {
     return DEBUG_WEATHER_STATE_NORMAL;
 }
 
+/**
+ * Read one JSON value from localStorage without propagating parse failures.
+ *
+ * @param {string} key Storage key.
+ * @returns {*} Parsed value, or null.
+ */
+function readStoredJson(key) {
+    var raw = localStorage.getItem(key);
+
+    if (raw === null) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(raw);
+    }
+    catch (ex) {
+        localStorage.removeItem(key);
+        return null;
+    }
+}
+
+/**
+ * Persist the coordinates represented by a successful weather payload.
+ *
+ * @param {Object} provider Active weather provider.
+ * @returns {{lat: number, lon: number}|null} Stored coordinates.
+ */
+function persistLastWeatherCoordinates(provider) {
+    var coordinates = provider && provider.weatherCoordinates
+        ? provider.weatherCoordinates
+        : provider && provider.requestCoordinates;
+    var lat = coordinates ? Number(coordinates.lat) : NaN;
+    var lon = coordinates ? Number(coordinates.lon) : NaN;
+
+    if (!isFinite(lat) || !isFinite(lon)) {
+        return null;
+    }
+
+    localStorage.setItem(KEY_LAST_WEATHER_COORDINATES, JSON.stringify({
+        lat: lat,
+        lon: lon,
+        provider: provider.id,
+        updatedAtUtc: new Date().toISOString()
+    }));
+    return { lat: lat, lon: lon };
+}
+
+/**
+ * Clear travel state once displayed weather belongs to the sampled location.
+ *
+ * @param {{lat: number, lon: number}|null} weatherCoordinates Displayed weather point.
+ * @returns {void}
+ */
+function reconcileTravelStateAfterSuccess(weatherCoordinates) {
+    var state = travelMonitor.normalizeState(readStoredJson(KEY_TRAVEL_MONITOR_STATE));
+    var sample = state.lastSample;
+
+    if (!weatherCoordinates || !sample) {
+        return;
+    }
+    if (travelMonitor.distanceKm(
+        weatherCoordinates.lat,
+        weatherCoordinates.lon,
+        sample.lat,
+        sample.lon
+    ) >= travelMonitor.MOVEMENT_DISTANCE_KM) {
+        return;
+    }
+
+    state.movementDetected = false;
+    state.stationary = false;
+    state.lastRefreshAttempt = null;
+    localStorage.setItem(KEY_TRAVEL_MONITOR_STATE, JSON.stringify(state));
+}
+
+/**
+ * Return whether an arrival refresh may bypass an active provider cooldown.
+ *
+ * @param {Object|null} backoff Active cooldown record.
+ * @returns {boolean} True only for transient connectivity failures.
+ */
+function canTravelRefreshBypassBackoff(backoff) {
+    var reason = backoff && typeof backoff.reason === 'string' ? backoff.reason : '';
+
+    return reason.indexOf('timeout') !== -1 || reason.indexOf('network_error') !== -1;
+}
+
+/**
+ * Round a debug distance without adding noisy precision to the copyable log.
+ *
+ * @param {number|null} distance Distance in kilometres.
+ * @returns {number|null} Distance rounded to one decimal place.
+ */
+function debugDistance(distance) {
+    return typeof distance === 'number' && isFinite(distance)
+        ? Math.round(distance * 10) / 10
+        : null;
+}
+
+/**
+ * Sample low-accuracy GPS periodically and refresh weather after arrival.
+ *
+ * @returns {void}
+ */
+function maybeMonitorTravel() {
+    var now = Date.now();
+    var state;
+
+    if (activeFixture || !app.settings || app.settings.location || app.fetchInProgress
+        || app.travelLocationInProgress || !isWatchConnected()
+        || !navigator.geolocation || typeof navigator.geolocation.getCurrentPosition !== 'function') {
+        return;
+    }
+
+    state = travelMonitor.normalizeState(readStoredJson(KEY_TRAVEL_MONITOR_STATE));
+    if (!travelMonitor.isSampleDue(state, now)) {
+        return;
+    }
+
+    state = travelMonitor.markSampleAttempt(state, now);
+    localStorage.setItem(KEY_TRAVEL_MONITOR_STATE, JSON.stringify(state));
+    app.travelLocationInProgress = true;
+    navigator.geolocation.getCurrentPosition(function(position) {
+        var currentState;
+        var weatherCoordinates;
+        var sample;
+        var result;
+        var activeBackoff;
+        var bypassBackoff;
+        var fetchStarted;
+
+        app.travelLocationInProgress = false;
+        currentState = travelMonitor.normalizeState(readStoredJson(KEY_TRAVEL_MONITOR_STATE));
+        weatherCoordinates = readStoredJson(KEY_LAST_WEATHER_COORDINATES);
+        sample = {
+            lat: position.coords.latitude,
+            lon: position.coords.longitude,
+            accuracy: position.coords.accuracy
+        };
+        result = travelMonitor.evaluateSample(
+            currentState,
+            weatherCoordinates,
+            sample,
+            Date.now()
+        );
+        localStorage.setItem(KEY_TRAVEL_MONITOR_STATE, JSON.stringify(result.state));
+
+        appendDebugWeatherLog('travel_location_sample', {
+            valid: result.valid,
+            reason: result.reason || null,
+            accuracyMeters: Math.round(position.coords.accuracy),
+            distanceFromWeatherKm: debugDistance(result.distanceFromWeatherKm),
+            distanceFromPreviousKm: debugDistance(result.distanceFromPreviousKm),
+            movementDetected: Boolean(result.state.movementDetected),
+            stationary: Boolean(result.state.stationary)
+        });
+        if (result.movementStarted) {
+            appendDebugWeatherLog('travel_movement_detected', {
+                distanceFromWeatherKm: debugDistance(result.distanceFromWeatherKm)
+            });
+        }
+        if (result.stationaryStarted) {
+            appendDebugWeatherLog('travel_stationary', {
+                distanceFromWeatherKm: debugDistance(result.distanceFromWeatherKm),
+                distanceFromPreviousKm: debugDistance(result.distanceFromPreviousKm)
+            });
+        }
+        if (!result.shouldRefresh) {
+            return;
+        }
+
+        activeBackoff = getActiveFetchBackoff(app.provider.id);
+        bypassBackoff = activeBackoff !== null && canTravelRefreshBypassBackoff(activeBackoff);
+        if (activeBackoff !== null && !bypassBackoff) {
+            appendDebugWeatherLog('travel_refresh_deferred', {
+                provider: app.provider.id,
+                reason: activeBackoff.reason,
+                until: new Date(activeBackoff.until).toISOString()
+            });
+            return;
+        }
+
+        appendDebugWeatherLog('travel_refresh_triggered', {
+            provider: app.provider.id,
+            distanceFromWeatherKm: debugDistance(result.distanceFromWeatherKm),
+            bypassedTransientBackoff: bypassBackoff
+        });
+        fetchStarted = fetch(app.provider, false, bypassBackoff, 'travel_arrival');
+        if (!fetchStarted) {
+            appendDebugWeatherLog('travel_refresh_not_started', {
+                provider: app.provider.id
+            });
+        }
+    }, function(error) {
+        app.travelLocationInProgress = false;
+        appendDebugWeatherLog('travel_location_failed', {
+            code: error && error.code,
+            message: error && error.message
+        });
+    }, {
+        enableHighAccuracy: false,
+        maximumAge: 5 * 60 * 1000,
+        timeout: 10 * 1000
+    });
+}
+
 function startTick() {
     console.log('Tick from PKJS!');
     tryFetch(app.provider);
+    maybeMonitorTravel();
     setTimeout(startTick, 60 * 1000); // 60 * 1000 milsec = 1 minute
 }
 
@@ -1069,8 +1069,6 @@ function clayTryDevConfig(devConfig) {
 
     var localOnlyDevConfigKeys = {
         clearPkjsStorageOnBoot: true,
-        forceShowReleaseNotificationOnBoot: true,
-        maxNotifiedVersion: true,
         resetV134WeekendHolidayColorMigration: true,
     };
 
@@ -1259,9 +1257,10 @@ function sendFixtureWeather(fixture) {
  * @param {WeatherProvider} provider Weather provider instance.
  * @param {boolean} force Force provider cache refresh.
  * @param {boolean=} bypassFetchBackoff Allow an explicit user refresh through cooldown.
- * @returns {void}
+ * @param {string=} fetchReason Optional scheduler reason for diagnostics.
+ * @returns {boolean} True when a fetch was started.
  */
-function fetch(provider, force, bypassFetchBackoff) {
+function fetch(provider, force, bypassFetchBackoff, fetchReason) {
     var activeBackoff;
 
     provider.skipPrimaryFetch = false;
@@ -1270,12 +1269,12 @@ function fetch(provider, force, bypassFetchBackoff) {
 
     if (!isWatchConnected()) {
         console.log('Skipping weather fetch: no watch connected.');
-        return;
+        return false;
     }
 
     if (app.fetchInProgress && Date.now() - app.fetchStartedAt < FETCH_WATCHDOG_MS) {
         console.log('Skipping weather fetch: another fetch is already in progress.');
-        return;
+        return false;
     }
 
     if (app.fetchInProgress) {
@@ -1290,13 +1289,26 @@ function fetch(provider, force, bypassFetchBackoff) {
 
     if (typeof provider.isGeocodeBackoffActive === 'function' && provider.isGeocodeBackoffActive()) {
         console.log('Skipping weather fetch: geocoding is in backoff cooldown.');
-        return;
+        return false;
     }
 
     activeBackoff = getActiveFetchBackoff(provider.id);
     if (activeBackoff !== null && !bypassFetchBackoff) {
         if (provider.id === 'yandex') {
+            if (!canAttemptBackoffFallback(provider.id)) {
+                console.log('Skipping weather fetch: Yandex cooldown fallback was already attempted this hour.');
+                appendDebugWeatherLog('fetch_skipped_backoff', {
+                    provider: provider.id,
+                    force: Boolean(force),
+                    reason: activeBackoff.reason,
+                    until: new Date(activeBackoff.until).toISOString(),
+                    remainingMs: Math.max(0, activeBackoff.until - Date.now()),
+                    fallbackAlreadyAttempted: true
+                });
+                return false;
+            }
             console.log('Skipping Yandex primary fetch: provider is in fetch cooldown; trying fallback data.');
+            markBackoffFallbackAttempt(provider.id);
             provider.skipPrimaryFetch = true;
             provider.skipPrimaryFetchReason = activeBackoff.reason;
             appendDebugWeatherLog('fetch_using_backoff_fallback', {
@@ -1316,7 +1328,7 @@ function fetch(provider, force, bypassFetchBackoff) {
                 until: new Date(activeBackoff.until).toISOString(),
                 remainingMs: Math.max(0, activeBackoff.until - Date.now())
             });
-            return;
+            return false;
         }
     }
 
@@ -1331,6 +1343,7 @@ function fetch(provider, force, bypassFetchBackoff) {
         provider: provider.id,
         providerName: provider.name,
         force: Boolean(force),
+        reason: fetchReason || 'scheduled',
         location: app.settings ? app.settings.location : null
     });
     var fetchStart = Date.now();
@@ -1346,16 +1359,22 @@ function fetch(provider, force, bypassFetchBackoff) {
             function() {
                 var warnings = getProviderWarnings(provider);
                 var diagnostics = getProviderDiagnostics(provider);
+                var weatherCoordinates;
                 // Sucess, update recent fetch time
                 app.fetchInProgress = false;
                 localStorage.setItem(KEY_LAST_FETCH_SUCCESS, JSON.stringify(fetchStatus));
                 resetFetchAttemptCounter();
                 if (provider.fetchBackoffFailure) {
-                    writeFetchBackoff(provider, provider.fetchBackoffFailure);
+                    markBackoffFallbackAttempt(provider.id);
+                    if (!(provider.skipPrimaryFetch && activeBackoff !== null)) {
+                        writeFetchBackoff(provider, provider.fetchBackoffFailure);
+                    }
                 }
                 else {
                     clearFetchBackoff(provider.id);
                 }
+                weatherCoordinates = persistLastWeatherCoordinates(provider);
+                reconcileTravelStateAfterSuccess(weatherCoordinates);
                 console.log('Successfully fetched weather!');
                 appendDebugWeatherLog(warnings.length > 0 ? 'fetch_success_with_warnings' : 'fetch_success', {
                     provider: provider.id,
@@ -1368,6 +1387,13 @@ function fetch(provider, force, bypassFetchBackoff) {
                     durationMs: Date.now() - fetchStart
                 });
                 sendDebugWeatherStatus(false, getDebugWeatherState(diagnostics));
+                if (fetchReason === 'travel_arrival') {
+                    appendDebugWeatherLog('travel_refresh_success', {
+                        provider: provider.id,
+                        usedFallback: Boolean(provider.fetchBackoffFailure),
+                        weatherCoordinates: weatherCoordinates
+                    });
+                }
                 maybeTrackWeatherFetch({
                     provider: provider.id,
                     success: true,
@@ -1383,15 +1409,26 @@ function fetch(provider, force, bypassFetchBackoff) {
             },
             function(failure) {
                 var backoffRecord;
+                var backoffPreserved = false;
                 // Failure
                 app.fetchInProgress = false;
-                backoffRecord = writeFetchBackoff(provider, failure);
+                if (provider.skipPrimaryFetch && activeBackoff !== null) {
+                    backoffRecord = activeBackoff;
+                    backoffPreserved = true;
+                }
+                else {
+                    backoffRecord = writeFetchBackoff(provider, failure);
+                }
+                if (provider.id === 'yandex') {
+                    markBackoffFallbackAttempt(provider.id);
+                }
                 console.log('[!] Provider failed to update weather: ' + JSON.stringify(failure));
                 appendDebugWeatherLog('fetch_failed', {
                     provider: provider.id,
                     failure: failure,
                     backoffUntil: new Date(backoffRecord.until).toISOString(),
                     backoffDurationMs: backoffRecord.durationMs,
+                    backoffPreserved: backoffPreserved,
                     usedGpsCache: provider.usedGpsCache,
                     gpsErrorCode: provider.gpsErrorCode,
                     locationMode: provider.locationMode,
@@ -1399,6 +1436,13 @@ function fetch(provider, force, bypassFetchBackoff) {
                     durationMs: Date.now() - fetchStart
                 });
                 sendDebugWeatherStatus(true, DEBUG_WEATHER_STATE_NORMAL);
+                if (fetchReason === 'travel_arrival') {
+                    appendDebugWeatherLog('travel_refresh_failed', {
+                        provider: provider.id,
+                        failure: failure,
+                        retryAt: new Date(backoffRecord.until).toISOString()
+                    });
+                }
                 var attemptStatus = {
                     time: fetchStatus.time,
                     id: fetchStatus.id,
@@ -1421,7 +1465,7 @@ function fetch(provider, force, bypassFetchBackoff) {
                 });
             },
             force
-        )
+        );
     }
     catch (e) {
         app.fetchInProgress = false;
@@ -1431,7 +1475,9 @@ function fetch(provider, force, bypassFetchBackoff) {
             message: e.message
         });
         sendDebugWeatherStatus(true, DEBUG_WEATHER_STATE_NORMAL);
+        return false;
     }
+    return true;
 }
 
 /**
@@ -1509,9 +1555,16 @@ function parseFetchStatusTime(statusString) {
 function needRefresh(provider) {
     var refreshMinutes = getRefreshMinutes(provider);
     var lastFetchSuccessTime;
+    var activeBackoff;
 
     if (hasExpiredFetchBackoff(provider && provider.id)) {
         return true;
+    }
+
+    activeBackoff = getActiveFetchBackoff(provider && provider.id);
+    if (activeBackoff !== null) {
+        return provider && provider.id === 'yandex'
+            && canAttemptBackoffFallback(provider.id);
     }
 
     // If the weather has never been fetched

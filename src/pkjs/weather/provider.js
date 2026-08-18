@@ -260,6 +260,8 @@ var WeatherProvider = function() {
     this.locationMode = null;
     this.warnings = [];
     this.diagnostics = {};
+    this.requestCoordinates = null;
+    this.weatherCoordinates = null;
 };
 
 WeatherProvider.prototype.gpsEnable = function() {
@@ -639,8 +641,14 @@ WeatherProvider.prototype.fetch = function(onSuccess, onFailure, force) {
     this.locationMode = null;
     this.warnings = [];
     this.diagnostics = {};
+    this.requestCoordinates = null;
+    this.weatherCoordinates = null;
 
     this.withCoordinates((function(lat, lon) {
+        this.requestCoordinates = {
+            lat: finiteCoordinate(lat),
+            lon: finiteCoordinate(lon)
+        };
         this.withCityName(lat, lon, (function(cityName, countryCode) {
             this.countryCode = countryCode;
             this.withSunEvents(lat, lon, (function(sunEvents) {

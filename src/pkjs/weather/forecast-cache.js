@@ -249,6 +249,10 @@ function populateProviderFromCache(provider, cache, windowTimes, sourceName) {
     if (provider.currentFeelsLike === null && finiteNumber(provider.feelsLikeTrend[0]) !== null) {
         provider.currentFeelsLike = provider.feelsLikeTrend[0];
     }
+    provider.weatherCoordinates = {
+        lat: finiteNumber(cache.coordinates && cache.coordinates.lat),
+        lon: finiteNumber(cache.coordinates && cache.coordinates.lon)
+    };
     provider.diagnostics.cache = {
         source: sourceName,
         primaryFetchedAtUtc: cache.fetchedAtUtc,

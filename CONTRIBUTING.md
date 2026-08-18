@@ -140,8 +140,6 @@ If you want the extra Pebble heap debug logs, set `ENABLE_MEMORY_LOGGING=1` in y
 
 For deterministic emulator UI, set `FIXTURE=<name>` in `.env` before building or installing. Fixture files live in `fixtures/<name>.json` and define the watch facts and weather payload used by local builds.
 
-Release notification copy (optional “what’s new” toast on upgrade) lives in `release-notifications.json`, keyed by the exact `version` string from the template (e.g. `"1.26.0"`); use `dev-config.js` `maxNotifiedVersion` to simulate skipped-version upgrades locally.
-
 If you want to regenerate `package.json` without building:
 
 ```bash
@@ -259,25 +257,6 @@ module.exports.clearPkjsStorageOnBoot = true;
 Notes:
 
 - Keep this set to `true` only while testing first-install behavior.
-- Set it back to `false` before testing upgrade-notification behavior.
-- This is local-only dev behavior and is not written into Clay settings.
-
-### Release notification preview (dev)
-
-Use this key in `src/pkjs/dev-config.js` to always show the notification for a **specific version key** from `release-notifications.json` on every app boot (ignores upgrade gating):
-
-- `forceShowReleaseNotificationOnBoot = '1.26.0'` (string must match a key in `release-notifications.json` exactly)
-
-Example:
-
-```javascript
-module.exports.forceShowReleaseNotificationOnBoot = '1.26.0';
-```
-
-Notes:
-
-- Useful when `package.json` is still on an older version but you want to iterate on copy for the next release entry.
-- Remove the key (or comment it out) when testing normal upgrade behavior.
 - This is local-only dev behavior and is not written into Clay settings.
 
 ### Fixtures (emulator/dev)
