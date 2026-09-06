@@ -8,6 +8,11 @@ enum TimeFont {
     TIME_FONT_BITHAM = 2,
 };
 
+enum FaceTheme {
+    FACE_THEME_DARK = 0,
+    FACE_THEME_LIGHT = 1,
+};
+
 enum HolidaySet {
     HOLIDAY_SET_NONE = 0,
     HOLIDAY_SET_US = 1,
@@ -40,6 +45,10 @@ typedef struct {
     GColor color_holiday_2;
     bool show_feels_like;
     GColor color_feels_like;
+    /* Appended last on purpose: persist_get_config() reads a prefix of the
+     * stored blob, so trailing fields keep their defaults on upgrade. */
+    uint8_t calendar_weeks;
+    uint8_t face_theme;
 } Config;
 
 extern Config *g_config;
@@ -57,6 +66,9 @@ int config_format_time(char *s, size_t maxsize, const struct tm * tm_p);
 int config_axis_hour(int hour);
 
 int config_n_today();
+
+/** Number of calendar rows to render (2 or 3). */
+int config_calendar_weeks();
 
 GFont config_time_font();
 

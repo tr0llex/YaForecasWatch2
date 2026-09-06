@@ -16,24 +16,66 @@ var config = [
         "items": [
             {
                 "type": "heading",
-                "defaultValue": "Time",
+                "defaultValue": "Страница настроек",
+            },
+            {
+                "type": "select",
+                "label": "Тема",
+                "messageKey": "configTheme",
+                "defaultValue": "light",
+                "description": "Оформление этой страницы. «Применить» сохраняет и оставляет её открытой.",
+                "options": [
+                    {
+                        "label": "Светлая",
+                        "value": "light"
+                    },
+                    {
+                        "label": "Тёмная",
+                        "value": "dark"
+                    }
+                ]
+            },
+        ]
+    },
+    {
+        "type": "section",
+        "items": [
+            {
+                "type": "heading",
+                "defaultValue": "Часы",
+            },
+            {
+                "type": "select",
+                "label": "Тема циферблата",
+                "messageKey": "faceTheme",
+                "defaultValue": "dark",
+                "options": [
+                    {
+                        "label": "Тёмная",
+                        "value": "dark"
+                    },
+                    {
+                        "label": "Светлая",
+                        "value": "light"
+                    }
+                ]
             },
             {
                 "type": "toggle",
-                "label": "Leading zero",
+                "label": "Ведущий ноль",
                 "messageKey": "timeLeadingZero",
             },
             {
                 "type": "toggle",
-                "label": "Show AM/PM",
+                "label": "Показывать AM/PM",
                 "messageKey": "timeShowAmPm",
             },
             {
                 "type": "select",
-                "label": "Axis time format",
+                "label": "Формат оси графика",
                 "messageKey": "axisTimeFormat",
                 "defaultValue": "24h",
-                "description": "Tip: go to Settings > Date & Time > Time Format on your watch to change the main time format",
+                "description": "Формат самих часов (12/24) меняется на часах: Settings > Date &amp; Time > Time Format",
                 "options": [
                     {
                         "label": "12h",
@@ -47,7 +89,7 @@ var config = [
             },
             {
                 "type": "select",
-                "label": "Main time font",
+                "label": "Шрифт часов",
                 "messageKey": "timeFont",
                 "defaultValue": "roboto",
                 "options": [
@@ -67,7 +109,7 @@ var config = [
             },
             {
                 "type": "color",
-                "label": "Main time color",
+                "label": "Цвет часов",
                 "messageKey": "colorTime",
                 "defaultValue": "#FFFFFF",
                 "sunlight": false,
@@ -80,52 +122,69 @@ var config = [
         "items": [
             {
                 "type": "heading",
-                "defaultValue": "Calendar",
+                "defaultValue": "Календарь",
             },
             {
                 "type": "select",
-                "label": "Start week on",
+                "label": "Начало недели",
                 "messageKey": "weekStartDay",
                 "defaultValue": "sun",
                 "options": [
                     {
-                        "label": "Sunday",
+                        "label": "Воскресенье",
                         "value": "sun"
                     },
                     {
-                        "label": "Monday",
+                        "label": "Понедельник",
                         "value": "mon"
                     }
                 ]
             },
             {
                 "type": "select",
-                "label": "First week to display",
+                "label": "Рядов календаря",
+                "messageKey": "calendarWeeks",
+                "defaultValue": "2",
+                "description": "Третий ряд занимает место — часы автоматически станут меньше.",
+                "options": [
+                    {
+                        "label": "2 недели",
+                        "value": "2"
+                    },
+                    {
+                        "label": "3 недели",
+                        "value": "3"
+                    }
+                ]
+            },
+            {
+                "type": "select",
+                "label": "Первый ряд",
                 "messageKey": "firstWeek",
                 "defaultValue": "prev",
                 "options": [
                     {
-                        "label": "Previous week",
+                        "label": "Прошлая неделя",
                         "value": "prev"
                     },
                     {
-                        "label": "Current week",
+                        "label": "Текущая неделя",
                         "value": "curr"
                     }
                 ]
             },
             {
                 "type": "color",
-                "label": "Today highlight",
+                "label": "Подсветка сегодня",
                 "messageKey": "colorToday",
                 "defaultValue": "#000000",
-                "description": "Black (default) means match date color, any other value overrides this.",
+                "description": "Чёрный (по умолчанию) — цвет как у даты; любой другой цвет переопределяет.",
                 "sunlight": false,
                 "capabilities": ["COLOR"]
             },
             {
                 "type": "color",
-                "label": "Sunday color",
+                "label": "Цвет воскресений",
                 "messageKey": "colorSunday",
                 "defaultValue": "#FF0055",
                 "sunlight": false,
@@ -133,15 +192,43 @@ var config = [
             },
             {
                 "type": "color",
-                "label": "Saturday color",
+                "label": "Цвет суббот",
                 "messageKey": "colorSaturday",
                 "defaultValue": "#FF0055",
                 "sunlight": false,
                 "capabilities": ["COLOR"]
             },
             {
+                "type": "select",
+                "label": "Набор праздников 1",
+                "messageKey": "holidaySet1",
+                "defaultValue": "1",
+                "options": [
+                    {
+                        "label": "Нет",
+                        "value": "0"
+                    },
+                    {
+                        "label": "США",
+                        "value": "1"
+                    },
+                    {
+                        "label": "Россия",
+                        "value": "2"
+                    },
+                    {
+                        "label": "Испания",
+                        "value": "3"
+                    },
+                    {
+                        "label": "Испания + Каталония",
+                        "value": "4"
+                    }
+                ]
+            },
+            {
                 "type": "color",
-                "label": "Holiday set 1 color",
+                "label": "Цвет набора 1",
                 "messageKey": "colorHoliday1",
                 "defaultValue": "#FF0055",
                 "sunlight": false,
@@ -149,67 +236,39 @@ var config = [
             },
             {
                 "type": "select",
-                "label": "Holiday set 1",
-                "messageKey": "holidaySet1",
-                "defaultValue": "1",
+                "label": "Набор праздников 2",
+                "messageKey": "holidaySet2",
+                "defaultValue": "0",
                 "options": [
                     {
-                        "label": "None",
+                        "label": "Нет",
                         "value": "0"
                     },
                     {
-                        "label": "US",
+                        "label": "США",
                         "value": "1"
                     },
                     {
-                        "label": "Russia",
+                        "label": "Россия",
                         "value": "2"
                     },
                     {
-                        "label": "Spain national",
+                        "label": "Испания",
                         "value": "3"
                     },
                     {
-                        "label": "Spain + Catalonia",
+                        "label": "Испания + Каталония",
                         "value": "4"
                     }
                 ]
             },
             {
                 "type": "color",
-                "label": "Holiday set 2 color",
+                "label": "Цвет набора 2",
                 "messageKey": "colorHoliday2",
                 "defaultValue": "#00AAFF",
                 "sunlight": false,
                 "capabilities": ["COLOR"]
-            },
-            {
-                "type": "select",
-                "label": "Holiday set 2",
-                "messageKey": "holidaySet2",
-                "defaultValue": "0",
-                "options": [
-                    {
-                        "label": "None",
-                        "value": "0"
-                    },
-                    {
-                        "label": "US",
-                        "value": "1"
-                    },
-                    {
-                        "label": "Russia",
-                        "value": "2"
-                    },
-                    {
-                        "label": "Spain national",
-                        "value": "3"
-                    },
-                    {
-                        "label": "Spain + Catalonia",
-                        "value": "4"
-                    }
-                ]
             },
         ]
     },
@@ -218,13 +277,13 @@ var config = [
         "items": [
             {
                 "type": "heading",
-                "defaultValue": "Weather"
+                "defaultValue": "Погода"
             },
             {
                 "type": "select",
                 "defaultValue": "f",
                 "messageKey": "temperatureUnits",
-                "label": "Temperature Units",
+                "label": "Единицы температуры",
                 "options": [
                     {
                         "label": "°F",
@@ -238,28 +297,28 @@ var config = [
             },
             {
                 "type": "toggle",
-                "label": "Day/night shading",
+                "label": "Затенение ночи",
                 "messageKey": "dayNightShading",
                 "defaultValue": true,
-                "description": "Show hatch shading between sunset and sunrise to distinguish day and night on the forecast graph."
+                "description": "Штриховка между закатом и рассветом, чтобы отличать ночь на графике."
             },
             {
                 "type": "toggle",
-                "label": "Show feels-like temperature",
+                "label": "Показывать «ощущается как»",
                 "messageKey": "showFeelsLike",
                 "defaultValue": false,
-                "description": "Show apparent temperature as dotted points when the selected provider supports it."
+                "description": "Показывать «ощущается как» пунктиром, если источник её отдаёт."
             },
             {
                 "type": "color",
-                "label": "Feels-like graph color",
+                "label": "Цвет «ощущается как»",
                 "messageKey": "colorFeelsLike",
                 "defaultValue": "#FFFF00",
                 "capabilities": ["COLOR"]
             },
             {
                 "type": "radiogroup",
-                "label": "Provider",
+                "label": "Источник погоды",
                 "messageKey": "provider",
                 "defaultValue": "wunderground",
                 "options": [
@@ -283,9 +342,9 @@ var config = [
             },
             {
                 "type": "input",
-                "label": "OpenWeatherMap API key",
+                "label": "Ключ API OpenWeatherMap",
                 "messageKey": "owmApiKey",
-                "description": "<a href='https://openweathermap.org/'>Register an OpenWeatherMap account</a> and paste your API key here",
+                "description": "<a href='https://openweathermap.org/'>Зарегистрируйтесь в OpenWeatherMap</a> и вставьте сюда ключ API",
                 "attributes": {
                     "type": "password",
                     "autocomplete": "off",
@@ -296,9 +355,9 @@ var config = [
             },
             {
                 "type": "input",
-                "label": "Yandex Weather API key",
+                "label": "Ключ API Яндекс.Погоды",
                 "messageKey": "yandexApiKey",
-                "description": "<a href='https://yandex.ru/pogoda/b2b/smarthome'>Get a Yandex Weather API key</a> and paste it here",
+                "description": "<a href='https://yandex.ru/pogoda/b2b/smarthome'>Получите ключ API Яндекс.Погоды</a> и вставьте его сюда. На бесплатном тарифе доступны только сегодня и завтра, УФ-индекс не отдаётся, лимит — 30 запросов в сутки и 1000 в месяц; циферблат сам держится в этих рамках и обновляет погоду раз в два часа. Данные предоставлены сервисом Яндекс Погода.",
                 "attributes": {
                     "type": "password",
                     "autocomplete": "off",
@@ -309,15 +368,15 @@ var config = [
             },
             {
                 "type": "toggle",
-                "label": "Force weather fetch",
+                "label": "Обновить погоду сейчас",
                 "messageKey": "fetch",
-                "description": "Last successful fetch:<br><span id='lastFetchSpan'>Never :(</span><span id='lastAttemptBlock'></span>"
+                "description": "Последнее успешное обновление:<br><span id='lastFetchSpan'>ещё не было</span><span id='lastAttemptBlock'></span>"
             },
             {
                 "type": "input",
-                "label": "Location override",
+                "label": "Задать местоположение",
                 "messageKey": "location",
-                "description": "Example: \"Manhattan\" or \"123 Oak St Plainsville KY\".<br><a href=\"https://locationiq.com/demo\">Click here</a> to test out your location query.<br>To use GPS, leave this blank and ensure GPS is enabled on your device.",
+                "description": "Например: «Москва» или «Тверская 7, Москва».<br><a href=\"https://locationiq.com/demo\">Проверить запрос</a>.<br>Для GPS оставьте поле пустым и включите геолокацию на телефоне.",
                 "attributes": {
                     "placeholder": "Using GPS",
                 }
@@ -329,17 +388,17 @@ var config = [
         "items": [
             {
                 "type": "heading",
-                "defaultValue": "Misc"
+                "defaultValue": "Прочее"
             },
             {
                 "type": "toggle",
-                "label": "Show quiet time icon",
+                "label": "Значок «не беспокоить»",
                 "messageKey": "showQt",
                 "defaultValue": true
             },
             {
                 "type": "toggle",
-                "label": "Vibrate on bluetooth disconnect",
+                "label": "Вибрация при потере связи",
                 "messageKey": "vibe",
                 "defaultValue": false
             },
@@ -347,22 +406,22 @@ var config = [
                 "type": "select",
                 "defaultValue": "both",
                 "messageKey": "btIcons",
-                "label": "Show icon for bluetooth",
+                "label": "Значок Bluetooth",
                 "options": [
                     {
-                        "label": "Disconnected",
+                        "label": "При обрыве связи",
                         "value": "disconnected"
                     },
                     {
-                        "label": "Connected",
+                        "label": "При наличии связи",
                         "value": "connected"
                     },
                     {
-                        "label": "Both",
+                        "label": "Всегда",
                         "value": "both"
                     },
                     {
-                        "label": "None",
+                        "label": "Нет",
                         "value": "none"
                     }
                 ]
@@ -371,7 +430,7 @@ var config = [
     },
     {
         "type": "submit",
-        "defaultValue": "Save Settings"
+        "defaultValue": "Сохранить и закрыть"
     },
     {
         "type": "text",

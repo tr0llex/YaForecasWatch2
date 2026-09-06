@@ -1,4 +1,5 @@
 #include "config.h"
+#include "ui_fonts.h"
 #include "persist.h"
 #include "math.h"
 #include "memory_log.h"
@@ -39,7 +40,9 @@ static Config config_defaults(void) {
         .holiday_set_1 = HOLIDAY_SET_US,
         .holiday_set_2 = HOLIDAY_SET_NONE,
         .color_holiday_1 = GColorFolly,
-        .color_holiday_2 = GColorVividCerulean
+        .color_holiday_2 = GColorVividCerulean,
+        .calendar_weeks = 2,
+        .face_theme = FACE_THEME_DARK
     };
 }
 
@@ -107,7 +110,29 @@ int config_n_today() {
     return wday;
 }
 
+int config_calendar_weeks() {
+    const int weeks = g_config->calendar_weeks;
+    /* Zero means "written by a build that predates this option". */
+    if (weeks != 2 && weeks != 3) return 2;
+    return weeks;
+}
+
 GFont config_time_font() {
+#ifdef PBL_PLATFORM_EMERY
+    /* Roboto — собственный ресурс, его размер подбирается под высоту полосы;
+     * Leco и Bitham берём системные. Раньше здесь всегда возвращался Roboto,
+     * и настройка «Шрифт часов» на emery просто ничего не делала. */
+    if (g_config->time_font == TIME_FONT_LECO) {
+        return fonts_get_system_font(FONT_KEY_LECO_60_NUMBERS_AM_PM);
+    }
+    if (g_config->time_font == TIME_FONT_BITHAM) {
+        return fonts_get_system_font(FONT_KEY_BITHAM_42_MEDIUM_NUMBERS);
+    }
+    /* Сюда на emery не приходят: time_layer сам берёт начертание по высоте
+     * полосы (ui_font_clock_for_height) и зовёт config_time_font() только
+     * для Leco и Bitham. Оставлен системный шрифт как безопасный ответ. */
+    return fonts_get_system_font(FONT_KEY_ROBOTO_BOLD_SUBSET_49);
+#else
     const char *font_keys[] = {
         [TIME_FONT_ROBOTO] = FONT_KEY_ROBOTO_BOLD_SUBSET_49,
 #ifdef PBL_PLATFORM_EMERY
@@ -123,6 +148,7 @@ GFont config_time_font() {
     if (font_index < 0 || font_index >= font_count)
         font_index = TIME_FONT_ROBOTO;
     return fonts_get_system_font(font_keys[font_index]);
+#endif
 }
 
 bool config_highlight_holidays() {

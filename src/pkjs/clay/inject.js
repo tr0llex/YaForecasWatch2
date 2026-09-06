@@ -31,7 +31,7 @@ module.exports = function (minified) {
         var entries = parseStoredJson(value);
 
         if (!Array.isArray(entries) || entries.length === 0) {
-            return 'No debug log yet.';
+            return 'Пока пусто.';
         }
 
         return entries.map(function(entry) {
@@ -68,8 +68,8 @@ module.exports = function (minified) {
         button = document.createElement('button');
         button.type = 'button';
         button.className = 'api-key-reveal';
-        button.textContent = 'Show';
-        button.setAttribute('aria-label', 'Show ' + fieldName);
+        button.textContent = 'Показать';
+        button.setAttribute('aria-label', 'Показать: ' + fieldName);
         button.setAttribute('aria-pressed', 'false');
         button.style.position = 'absolute';
         button.style.top = '0';
@@ -90,8 +90,9 @@ module.exports = function (minified) {
             event.preventDefault();
             event.stopPropagation();
             input.type = reveal ? 'text' : 'password';
-            button.textContent = reveal ? 'Hide' : 'Show';
-            button.setAttribute('aria-label', (reveal ? 'Hide ' : 'Show ') + fieldName);
+            button.textContent = reveal ? 'Скрыть' : 'Показать';
+            button.setAttribute('aria-label',
+                (reveal ? 'Скрыть: ' : 'Показать: ') + fieldName);
             button.setAttribute('aria-pressed', reveal ? 'true' : 'false');
             input.focus();
         });
@@ -120,10 +121,75 @@ module.exports = function (minified) {
 
         input.type = 'password';
         if (button) {
-            button.textContent = 'Show';
-            button.setAttribute('aria-label', 'Show ' + fieldName);
+            button.textContent = 'Показать';
+            button.setAttribute('aria-label', 'Показать: ' + fieldName);
             button.setAttribute('aria-pressed', 'false');
         }
+    }
+
+    /* Payload tag understood by index.js: save, then reopen the page instead of
+     * returning to the app. The platform only hands settings back on close, so
+     * "apply without closing" is really "close and immediately reopen". */
+    var KEEP_OPEN_KEY = '_keepConfigOpen';
+
+    /* Clay ships a dark page; these override its actual class names
+     * (.section #484848, inputs #333333, .description #a4a4a4). */
+    var LIGHT_THEME_CSS = [
+        'body { background: #ececed !important; color: #1c1c1e !important; }',
+        '.section { background: #ffffff !important; box-shadow: #d9d9de 0 0.15rem 0.25rem !important; }',
+        '.label { color: #1c1c1e !important; }',
+        /* Section headers keep Clay's dark #414141 bar unless overridden,
+         * which left dark text on a dark bar. */
+        '.section .component-heading {',
+        '  background: #e4e4e8 !important; color: #1c1c1e !important;',
+        '  border-bottom: 1px solid #d9d9de !important;',
+        '}',
+        '.section .component-heading * { color: #1c1c1e !important; }',
+        '.description, .component-text, .component-footer { color: #5f6368 !important; }',
+        '.component-input .input input, .component-select .value,',
+        '.component-slider .value, input, select, textarea {',
+        '  background: #f4f4f6 !important; color: #1c1c1e !important;',
+        '  border: 1px solid #c7c7cc !important;',
+        '}',
+        '.component-color .picker-wrap .picker {',
+        '  background: #ffffff !important;',
+        '  box-shadow: 0 0.17647rem 0.88235rem rgba(0, 0, 0, 0.25) !important;',
+        '}',
+        '.button { color: #ffffff !important; }',
+        '.api-key-reveal {',
+        '  background: #e9e9ee !important; color: #1c1c1e !important;',
+        '  border-left: 1px solid #c7c7cc !important;',
+        '}',
+        'a { color: #0a62c2 !important; }'
+    ].join(' ');
+
+    /**
+     * Apply or remove the light-theme stylesheet.
+     *
+     * @param {string} theme Either "light" or "dark".
+     * @returns {void}
+     */
+    function applyConfigTheme(theme) {
+        var styleId = 'fcw2-config-theme';
+        var existing = document.getElementById(styleId);
+        var style;
+
+        if (theme !== 'light') {
+            if (existing && existing.parentNode) {
+                existing.parentNode.removeChild(existing);
+            }
+            return;
+        }
+
+        if (existing) {
+            return;
+        }
+
+        style = document.createElement('style');
+        style.id = styleId;
+        style.type = 'text/css';
+        style.appendChild(document.createTextNode(LIGHT_THEME_CSS));
+        document.head.appendChild(style);
     }
 
     clayConfig.on(clayConfig.EVENTS.AFTER_BUILD, function() {
@@ -147,17 +213,26 @@ module.exports = function (minified) {
         var attemptText;
         var shouldShowLastAttempt;
         var debugWeatherLog;
+        var clayConfigTheme;
 
+        /* AFTER_BUILD навешивает всё остальное — кнопки «Показать», «Применить»,
+         * светлую тему. Раньше любой отсутствующий ключ (переименовали настройку,
+         * не обновили страницу) ронял обработчик на первом же get, и страница
+         * молча оставалась без всего, что идёт ниже. */
         clayFetch = clayConfig.getItemByMessageKey('fetch');
-        clayFetch.set(false);
-
-        // Save initial states to detect changes to provider
         clayOwmApiKey = clayConfig.getItemByMessageKey('owmApiKey');
         clayYandexApiKey = clayConfig.getItemByMessageKey('yandexApiKey');
         clayProvider = clayConfig.getItemByMessageKey('provider');
         clayLocation = clayConfig.getItemByMessageKey('location');
-        addApiKeyRevealButton(clayOwmApiKey, 'OpenWeatherMap API key');
-        addApiKeyRevealButton(clayYandexApiKey, 'Yandex Weather API key');
+
+        if (!clayFetch || !clayOwmApiKey || !clayYandexApiKey || !clayProvider || !clayLocation) {
+            console.log('[clay] config page is missing expected items, skipping enhancements');
+            return;
+        }
+
+        clayFetch.set(false);
+        addApiKeyRevealButton(clayOwmApiKey, 'ключ API OpenWeatherMap');
+        addApiKeyRevealButton(clayYandexApiKey, 'ключ API Яндекс.Погоды');
         initProvider = clayProvider.get();
         initOwmApiKey = clayOwmApiKey.get();
         initYandexApiKey = clayYandexApiKey.get();
@@ -177,14 +252,14 @@ module.exports = function (minified) {
                 clayOwmApiKey.show();
             }
             else {
-                maskApiKeyInput(clayOwmApiKey, 'OpenWeatherMap API key');
+                maskApiKeyInput(clayOwmApiKey, 'ключ API OpenWeatherMap');
                 clayOwmApiKey.hide();
             }
             if (this.get() === 'yandex') {
                 clayYandexApiKey.show();
             }
             else {
-                maskApiKeyInput(clayYandexApiKey, 'Yandex Weather API key');
+                maskApiKeyInput(clayYandexApiKey, 'ключ API Яндекс.Погоды');
                 clayYandexApiKey.hide();
             }
             console.log('Provider set to ' + this.get());
@@ -197,7 +272,8 @@ module.exports = function (minified) {
         if (lastFetchSuccess !== null) {
             date = new Date(lastFetchSuccess.time);
             lastFetchSuccessTime = date.getTime();
-            $('#lastFetchSpan').ht(date.toLocaleDateString() + ' ' + date.toLocaleTimeString() + ' with ' + lastFetchSuccess.name);
+            $('#lastFetchSpan').ht(date.toLocaleDateString() + ' ' + date.toLocaleTimeString()
+                + ', источник: ' + lastFetchSuccess.name);
         }
 
         lastFetchAttemptString = clayConfig.meta.userData.lastFetchAttempt;
@@ -209,9 +285,11 @@ module.exports = function (minified) {
                 shouldShowLastAttempt = !Boolean(lastFetchSuccessTime) || attemptTime > lastFetchSuccessTime;
 
                 if (shouldShowLastAttempt) {
-                    attemptText = '<br>Last failed attempt:<br>';
-                    attemptText += attemptDate.toLocaleDateString() + ' ' + attemptDate.toLocaleTimeString() + ' with ' + lastFetchAttempt.name;
-                    attemptText += '<br>Error: ' + lastFetchAttempt.error.stage + ': ' + lastFetchAttempt.error.code;
+                    attemptText = '<br>Последняя неудачная попытка:<br>';
+                    attemptText += attemptDate.toLocaleDateString() + ' ' + attemptDate.toLocaleTimeString()
+                        + ', источник: ' + lastFetchAttempt.name;
+                    attemptText += '<br>Ошибка: ' + lastFetchAttempt.error.stage
+                        + ': ' + lastFetchAttempt.error.code;
                     $('#lastAttemptBlock').ht(attemptText);
                 }
             }
@@ -227,9 +305,16 @@ module.exports = function (minified) {
             });
         }
 
-        // Override submit handler to force re-fetch if provider config changed
-        $('#main-form').on('submit', function() {
+        /**
+         * Serialise and hand the settings back to the watch.
+         *
+         * @param {boolean} keepOpen Reopen the page after saving.
+         * @returns {void}
+         */
+        function submitConfig(keepOpen) {
             var returnTo;
+            var payload;
+
             if (clayProvider.get() !== initProvider
                 || clayOwmApiKey.get() !== initOwmApiKey
                 || clayYandexApiKey.get() !== initYandexApiKey
@@ -237,10 +322,57 @@ module.exports = function (minified) {
                 clayFetch.set(true);
             }
 
+            payload = clayConfig.serialize();
+            if (keepOpen) {
+                payload[KEEP_OPEN_KEY] = { value: true };
+            }
+
             // Copied from original handler ($.off requires non-anonymous handler)
             returnTo = window.returnTo || 'pebblejs://close#';
-            location.href = returnTo +
-                encodeURIComponent(JSON.stringify(clayConfig.serialize()));
+            location.href = returnTo + encodeURIComponent(JSON.stringify(payload));
+        }
+
+        /**
+         * Add an "apply and stay" button next to the save button.
+         *
+         * @returns {void}
+         */
+        function addApplyButton() {
+            var form = document.getElementById('main-form');
+            var submitButton = form ? form.querySelector('[type="submit"]') : null;
+            var apply;
+
+            if (!form || !submitButton || document.getElementById('fcw2-apply')) {
+                return;
+            }
+
+            apply = document.createElement('button');
+            apply.id = 'fcw2-apply';
+            apply.type = 'button';
+            apply.className = submitButton.className;
+            apply.textContent = 'Применить';
+            apply.style.marginBottom = '0.5rem';
+            apply.addEventListener('click', function(event) {
+                event.preventDefault();
+                submitConfig(true);
+            });
+
+            submitButton.parentNode.insertBefore(apply, submitButton);
+        }
+
+        // Override submit handler to force re-fetch if provider config changed
+        $('#main-form').on('submit', function() {
+            submitConfig(false);
         })
+
+        addApplyButton();
+
+        clayConfigTheme = clayConfig.getItemByMessageKey('configTheme');
+        if (clayConfigTheme) {
+            applyConfigTheme(clayConfigTheme.get());
+            clayConfigTheme.on('change', function() {
+                applyConfigTheme(this.get());
+            });
+        }
     });
 };
