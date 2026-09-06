@@ -17,11 +17,15 @@ static Config s_config;
 // The C standard doesn't allow these in static variable initializers, so we use a
 // function instead. See: https://gcc.gnu.org/onlinedocs/gcc/Compound-Literals.html
 static Config config_defaults(void) {
+    /* Значения до первого сообщения с телефона. Раньше здесь стояли
+     * американские: часы без связи показывали Фаренгейт, американские
+     * праздники и неделю с воскресенья. Держим их такими же, как значения по
+     * умолчанию на странице настроек (src/pkjs/index.js). */
     return (Config) {
-        .celsius = false,
+        .celsius = true,
         .time_lead_zero = false,
         .axis_12h = false,
-        .start_mon = false,
+        .start_mon = true,
         .prev_week = true,
         .show_qt = true,
         .show_bt = true,
@@ -37,7 +41,7 @@ static Config config_defaults(void) {
         .color_time = GColorWhite,
         .color_feels_like = GColorYellow,
         .day_night_shading = true,
-        .holiday_set_1 = HOLIDAY_SET_US,
+        .holiday_set_1 = HOLIDAY_SET_RU,
         .holiday_set_2 = HOLIDAY_SET_NONE,
         .color_holiday_1 = GColorFolly,
         .color_holiday_2 = GColorVividCerulean,
