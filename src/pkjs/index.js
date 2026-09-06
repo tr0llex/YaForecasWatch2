@@ -1669,5 +1669,15 @@ function needRefresh(provider) {
         return true;
     }
 
+    /* Записанное время может оказаться в будущем: часы телефона перевели назад,
+     * или запись осталась от другого часового пояса. Тогда разность
+     * отрицательная, порог не достигается никогда — и погода молча перестаёт
+     * обновляться до тех пор, пока реальное время не догонит записанное.
+     * Считаем такую запись негодной и обновляемся. */
+    if (Date.now() < lastFetchSuccessTime) {
+        console.log('[!] Last fetch time is in the future; refreshing anyway');
+        return true;
+    }
+
     return Date.now() - lastFetchSuccessTime >= 1000 * 60 * refreshMinutes;
 }
