@@ -88,7 +88,8 @@ provider = makeProvider();
 provider.withCityName(56.9972, 40.9714, function(cityName, countryCode) {
   place = { cityName, countryCode };
 });
-assert.deepStrictEqual(place, { cityName: 'Unknown', countryCode: null });
+// Название по умолчанию русифицировано вместе со всем остальным интерфейсом.
+assert.deepStrictEqual(place, { cityName: 'Неизвестно', countryCode: null });
 assert.strictEqual(provider.diagnostics.reverseGeocode.status, 'unknown');
 assert.deepStrictEqual(provider.warnings.map(function(warning) {
   return warning.code;
