@@ -239,7 +239,7 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
                 year: year
             });
         }
-        onReady([], { status: 'disabled' });
+        answer([], { status: 'disabled' });
         return;
     }
 
@@ -255,7 +255,7 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
                     provisional: ruCalendar.isProvisional(year)
                 });
             }
-            onReady(builtIn, {
+            answer(builtIn, {
                 status: 'builtin',
                 provisional: ruCalendar.isProvisional(year)
             });
@@ -265,6 +265,22 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
 
     key = cacheKey(source.countryCode, source.scope, year);
     cached = readCache(key);
+
+    /* onReady обязан сработать ровно один раз: у вызывающего это шаг очереди
+     * (sendHolidayBitsets), и второй вызов сдвигает очередь ещё раз — часть
+     * заданий пропускается, и год праздников молча не доезжает до часов.
+     * Поэтому при устаревшем кеше отдаём его сразу, а обновление только
+     * перезаписывает кеш — свежие данные уедут на следующем запуске.
+     */
+    var alreadyAnswered = false;
+
+    function answer(dates, meta) {
+        if (alreadyAnswered) {
+            return;
+        }
+        alreadyAnswered = true;
+        onReady(dates, meta);
+    }
 
     function refresh() {
         fetchRawCountryYear(source.countryCode, year, function(raw) {
@@ -280,7 +296,7 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
                     dates: dates.length
                 });
             }
-            onReady(dates, { status: 'fresh', source: fresh.source });
+            answer(dates, { status: 'fresh', source: fresh.source });
         }, function(error) {
             console.log('[holidays] refresh failed for ' + key + ': ' + JSON.stringify(error));
             if (typeof debugLog === 'function') {
@@ -293,9 +309,7 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
                     error: error
                 });
             }
-            if (!cached) {
-                onReady([], { status: 'failed_empty', error: error });
-            }
+            answer([], { status: 'failed_empty', error: error });
         }, debugLog);
     }
 
@@ -310,7 +324,7 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
                 fetchedAtUtc: cached.fetchedAtUtc
             });
         }
-        onReady(cached.dates, {
+        answer(cached.dates, {
             status: isStale(cached, nowMs) ? 'stale' : 'cached',
             source: cached.source
         });
