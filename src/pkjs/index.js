@@ -877,9 +877,18 @@ function maybeMonitorTravel() {
 
 function startTick() {
     console.log('Tick from PKJS!');
-    tryFetch(app.provider);
-    maybeMonitorTravel();
+    // Следующий тик заводим ДО работы, а не после. Иначе одно исключение в
+    // загрузке погоды или в слежении за поездкой обрывает цикл навсегда: часы
+    // молчат до перезапуска приложения, и снаружи это выглядит как «погода
+    // перестала обновляться» без единой причины на экране.
     setTimeout(startTick, 60 * 1000); // 60 * 1000 milsec = 1 minute
+    try {
+        tryFetch(app.provider);
+        maybeMonitorTravel();
+    }
+    catch (ex) {
+        console.log('[!] Tick failed: ' + ex.message);
+    }
 }
 
 function sendClaySettings(onSuccess, onFailure) {
