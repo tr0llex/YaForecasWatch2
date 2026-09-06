@@ -178,6 +178,11 @@ function coordinateDistanceKm(lat1, lon1, lat2, lon2) {
     return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/* The watchface UI is Russian-only (see src/c/appendix/i18n.c), so place names
+ * are requested in Russian too. Cached labels record the language they were
+ * fetched in and are discarded when it changes. */
+var GEOCODE_LANG_CODE = 'RU';
+
 /**
  * Read a cached place label when it belongs to the current coordinates.
  *
@@ -195,6 +200,11 @@ function readReverseGeocodeCache(lat, lon) {
     if (!cached || currentLat === null || currentLon === null
         || cachedLat === null || cachedLon === null
         || typeof cached.cityName !== 'string' || cached.cityName.length === 0) {
+        return null;
+    }
+
+    if (cached.lang !== GEOCODE_LANG_CODE) {
+        // Label was fetched in another language; refetch rather than show it.
         return null;
     }
 
@@ -225,6 +235,7 @@ function writeReverseGeocodeCache(lat, lon, cityName, countryCode) {
         lon: finiteCoordinate(lon),
         cityName: cityName,
         countryCode: countryCode,
+        lang: GEOCODE_LANG_CODE,
         fetchedAtUtc: new Date().toISOString()
     }));
 }
@@ -249,8 +260,12 @@ function writeGeocodeBackoff() {
     return backoffMs;
 }
 
+/* Часов в графике по умолчанию. Провайдер живёт между обновлениями, поэтому
+ * тот, кто временно укорачивает окно, обязан вернуть это значение обратно. */
+var DEFAULT_NUM_ENTRIES = 24;
+
 var WeatherProvider = function() {
-    this.numEntries = 24;
+    this.numEntries = DEFAULT_NUM_ENTRIES;
     this.name = 'Template';
     this.id = 'interface';
     this.location = null; // Address query used for overriding the GPS
@@ -351,8 +366,8 @@ WeatherProvider.prototype.withSunEvents = function(lat, lon, callback, onFailure
 WeatherProvider.prototype.withCityName = function(lat, lon, callback) {
     // callback(cityName, countryCode)
     var provider = this;
-    var url = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?f=json&langCode=EN&location='
-        + lon + ',' + lat;
+    var url = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?f=json&langCode='
+        + GEOCODE_LANG_CODE + '&location=' + lon + ',' + lat;
     var handleFailure = function(error) {
         var cached = readReverseGeocodeCache(lat, lon);
 
@@ -374,7 +389,7 @@ WeatherProvider.prototype.withCityName = function(lat, lon, callback) {
             status: 'unknown',
             error: error.code
         };
-        callback('Unknown', null);
+        callback('Неизвестно', null);
     };
 
     request(
@@ -394,7 +409,7 @@ WeatherProvider.prototype.withCityName = function(lat, lon, callback) {
             }
 
             address = body.address || {};
-            name = address.District || address.City || address.Region || 'Unknown';
+            name = address.District || address.City || address.Region || 'Неизвестно';
             countryCode = address.CountryCode || null;
             writeReverseGeocodeCache(lat, lon, name, countryCode);
             provider.diagnostics.reverseGeocode = {
@@ -733,6 +748,20 @@ WeatherProvider.prototype.hasValidData = function() {
     }
 };
 
+/* Тип текущей погоды одним байтом. Провайдеры называют условия по-разному
+ * (Яндекс — словами, Open-Meteo — кодами WMO, OpenWeatherMap — своими id),
+ * поэтому каждый приводит их к этому набору, а часы рисуют по нему значок. */
+WeatherProvider.CONDITION = {
+    UNKNOWN: 0,
+    CLEAR: 1,
+    PARTLY_CLOUDY: 2,
+    CLOUDY: 3,
+    RAIN: 4,
+    SNOW: 5,
+    THUNDERSTORM: 6,
+    FOG: 7
+};
+
 WeatherProvider.prototype.getPayload = function() {
     // Get the rounded (integer) temperatures for those hours
     var temps = this.tempTrend.slice(0, this.numEntries).map(function(temperature) {
@@ -776,11 +805,13 @@ WeatherProvider.prototype.getPayload = function() {
         CURRENT_FEELS_LIKE: currentFeelsLike,
         CITY: this.cityName,
         // The first byte determines whether the list of events starts on a sunrise (0) or sunset (1)
-        SUN_EVENTS: [this.sunEvents[0].type === 'sunrise' ? 0 : 1].concat(sunEventsByteArray)
+        SUN_EVENTS: [this.sunEvents[0].type === 'sunrise' ? 0 : 1].concat(sunEventsByteArray),
+        CONDITION: typeof this.condition === 'number' ? this.condition : WeatherProvider.CONDITION.UNKNOWN
     };
     return payload;
 };
 
+WeatherProvider.DEFAULT_NUM_ENTRIES = DEFAULT_NUM_ENTRIES;
 WeatherProvider.request = request;
 
 module.exports = WeatherProvider;

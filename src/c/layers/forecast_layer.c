@@ -1,4 +1,6 @@
 #include "forecast_layer.h"
+#include "c/appendix/theme.h"
+#include "c/appendix/ui_fonts.h"
 #include "c/appendix/persist.h"
 #include "c/appendix/math.h"
 #include "c/appendix/config.h"
@@ -6,9 +8,15 @@
 #include "c/services/watch_services.h"
 
 #define LEFT_AXIS_LABEL_STRIP_MIN_W 15
-#define LEFT_AXIS_LABEL_TO_GRAPH_GAP 2
+/* Цифры слева прижимались вплотную к вертикальной оси. */
+#define LEFT_AXIS_LABEL_TO_GRAPH_GAP 4
 #define LEFT_AXIS_GRAPH_INSET_DEFAULT (LEFT_AXIS_LABEL_STRIP_MIN_W + LEFT_AXIS_LABEL_TO_GRAPH_GAP)
+#ifdef PBL_PLATFORM_EMERY
+/* Хватает на двузначное «10» шрифтом 12 px вместе с длинным штрихом шкалы. */
+#define RIGHT_UV_AXIS_W 23
+#else
 #define RIGHT_UV_AXIS_W 19
+#endif
 #define UV_AXIS_MINOR_TICK_W 2
 #define UV_AXIS_MAJOR_TICK_W 5
 #define UV_AXIS_LABEL_GAP 2
@@ -17,24 +25,34 @@
 #define TEMP_LABEL_MEASURE_BOX_W 200
 #define TEMP_LABEL_MEASURE_BOX_H 40
 #define BOTTOM_AXIS_FONT_OFFSET 4 // Adjustment for whitespace at top of font
+#ifdef PBL_PLATFORM_EMERY
+/* Подписям часов шрифтом 12 px нужно ~13 px плюс зазор до самой оси. */
+#define BOTTOM_AXIS_H 15
+#else
 #define BOTTOM_AXIS_H 10          // Height of the bottom axis (hour labels)
+#endif
 #define MARGIN_TEMP_H 7           // Height of margins for the temperature plot
 // emery: reserve extra bottom space for larger hour labels and tick marks.
 #ifdef PBL_PLATFORM_EMERY
 #define HOUR_LABEL_MIN_SPACING 24 // Minimum horizontal spacing for hour labels
-#define FORECAST_BOTTOM_PAD 10
-#define EMERY_AXIS_LABEL_TOP 6
-#define EMERY_AXIS_LABEL_H 14
+/* 10 px внизу полосы никто не рисовал — график просто не доходил до кромки. */
+#define FORECAST_BOTTOM_PAD 1
+#define EMERY_AXIS_LABEL_TOP 2
+#define EMERY_AXIS_LABEL_H 13
 #else
 #define HOUR_LABEL_MIN_SPACING 20 // Minimum horizontal spacing for hour labels
 #define FORECAST_BOTTOM_PAD 0
 #endif
-#define NIGHT_HATCH_SPACING PBL_IF_COLOR_ELSE(6, 7)
-#define NIGHT_HATCH_COLOR GColorDarkGray
+/* Штриховка кроет всю высоту графика, включая пустое небо над кривой; при
+ * шаге 6 px на полутора дюймах это заметный шум. */
+#define NIGHT_HATCH_SPACING PBL_IF_COLOR_ELSE(8, 7)
+#define NIGHT_HATCH_COLOR PBL_IF_COLOR_ELSE(theme_dim(), theme_fg())
 #define PRECIP_FILL_COLOR PBL_IF_COLOR_ELSE(GColorCobaltBlue, GColorLightGray)
-#define NIGHT_PRECIP_FILL_COLOR PBL_IF_COLOR_ELSE(GColorDukeBlue, GColorLightGray)
-#define NIGHT_HATCH_COLOR_PRECIP PBL_IF_COLOR_ELSE(GColorBlue, GColorWhite)
-#define NIGHT_BOUNDARY_COLOR PBL_IF_COLOR_ELSE(GColorDarkGray, GColorLightGray)
+/* На тёмной теме тёмно-синяя ночная заливка давала контраст 2.15 к чёрному
+ * и пропадала; ночь и без того размечена штриховкой и границами. */
+#define NIGHT_PRECIP_FILL_COLOR PBL_IF_COLOR_ELSE(theme_night_precip(), GColorLightGray)
+#define NIGHT_HATCH_COLOR_PRECIP PBL_IF_COLOR_ELSE(theme_night_hatch_precip(), GColorWhite)
+#define NIGHT_BOUNDARY_COLOR PBL_IF_COLOR_ELSE(theme_dim(), GColorLightGray)
 #define NIGHT_BOUNDARY_COLOR_PRECIP PBL_IF_COLOR_ELSE(GColorVividCerulean, GColorWhite)
 #define FORECAST_STEP_SECONDS (60 * 60)
 #define DAY_SECONDS (24 * 60 * 60)
@@ -112,12 +130,7 @@ static RenderSpec make_render_spec()
 {
     RenderSpec spec = {
         .draw_night_overlay = g_config->day_night_shading,
-        .axis_color = PBL_IF_COLOR_ELSE(GColorOrange, GColorWhite)};
-
-    if (spec.draw_night_overlay)
-    {
-        spec.axis_color = PBL_IF_COLOR_ELSE(GColorRed, GColorWhite);
-    }
+        .axis_color = PBL_IF_COLOR_ELSE(theme_dim(), GColorWhite)};
 
     return spec;
 }
@@ -137,7 +150,7 @@ static void draw_uv_axis(GContext *ctx, GRect graph_plot_rect)
 {
     const int16_t axis_x = graph_plot_rect.origin.x + graph_plot_rect.size.w;
     const int16_t axis_bottom = graph_plot_rect.origin.y + graph_plot_rect.size.h;
-    const GColor uv_color = PBL_IF_COLOR_ELSE(GColorYellow, GColorWhite);
+    const GColor uv_color = PBL_IF_COLOR_ELSE(theme_warm(), GColorWhite);
 
     graphics_context_set_stroke_color(ctx, uv_color);
     graphics_context_set_text_color(ctx, uv_color);
@@ -154,11 +167,20 @@ static void draw_uv_axis(GContext *ctx, GRect graph_plot_rect)
         if (is_major_tick)
         {
             char label[3];
+            const GFont label_font = ui_font_axis();
+            const int16_t label_w = RIGHT_UV_AXIS_W - UV_AXIS_MAJOR_TICK_W - UV_AXIS_LABEL_GAP;
+            GSize label_size;
+
             snprintf(label, sizeof(label), "%d", uv_index);
+            /* Сдвиг на 8 px подбирался под шрифт 16 px; теперь высоту меряем,
+             * чтобы цифра стояла ровно на своём штрихе. */
+            label_size = graphics_text_layout_get_content_size(
+                    label, label_font, GRect(0, 0, label_w, 40),
+                    GTextOverflowModeFill, GTextAlignmentLeft);
             graphics_draw_text(ctx, label,
-                               fonts_get_system_font(FONT_KEY_GOTHIC_14),
-                               GRect(axis_x + UV_AXIS_MAJOR_TICK_W + UV_AXIS_LABEL_GAP, tick_y - 8,
-                                     RIGHT_UV_AXIS_W - UV_AXIS_MAJOR_TICK_W - UV_AXIS_LABEL_GAP, 16),
+                               label_font,
+                               GRect(axis_x + UV_AXIS_MAJOR_TICK_W + UV_AXIS_LABEL_GAP,
+                                     tick_y - label_size.h / 2, label_w, label_size.h),
                                GTextOverflowModeFill,
                                GTextAlignmentLeft,
                                NULL);
@@ -329,7 +351,7 @@ static void draw_night_regions(GContext *ctx, GRect graph_plot_rect, time_t grap
 
     const int16_t hatch_spacing = NIGHT_HATCH_SPACING;
     const bool is_color = PBL_IF_COLOR_ELSE(true, false);
-    graphics_context_set_stroke_color(ctx, is_color ? NIGHT_HATCH_COLOR : GColorWhite);
+    graphics_context_set_stroke_color(ctx, is_color ? NIGHT_HATCH_COLOR : theme_fg());
 
     for (int i = 0; i < night_segments->count; ++i)
     {
@@ -444,7 +466,7 @@ static void draw_night_hatch_over_precip(GContext *ctx, GRect graph_plot_rect, t
             }
         }
 
-        graphics_context_set_stroke_color(ctx, is_color ? NIGHT_HATCH_COLOR_PRECIP : GColorWhite);
+        graphics_context_set_stroke_color(ctx, is_color ? NIGHT_HATCH_COLOR_PRECIP : theme_fg());
         for (int16_t x = x0; x < x1; ++x)
         {
             const int16_t precip_y = clamped_precip_top_y_for_x(graph_plot_rect, points_precip, num_entries, x);
@@ -523,7 +545,11 @@ static void draw_night_boundaries_over_precip(GContext *ctx, GRect graph_plot_re
     }
 }
 
+#ifdef PBL_PLATFORM_EMERY
+static GSize temp_label_size_with_font(const char *text, GFont font);
+#else
 static GSize temp_label_string_size(const char *text);
+#endif
 
 static void forecast_update_proc(Layer *layer, GContext *ctx)
 {
@@ -542,7 +568,7 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
     MemoryHeapProbe redraw_probe = MEMORY_HEAP_PROBE_START("forecast_update");
     if (stored_num_entries < 2)
     {
-        graphics_context_set_fill_color(ctx, GColorBlack);
+        graphics_context_set_fill_color(ctx, theme_bg());
         graphics_fill_rect(ctx, bounds, 0, GCornerNone);
         MEMORY_LOG_HEAP("forecast_update:exit");
         return;
@@ -606,7 +632,7 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
         draw_night_boundaries(ctx, graph_plot_rect, forecast_start, forecast_end, &night_segments);
     }
 
-    graphics_context_set_text_color(ctx, GColorWhite);
+    graphics_context_set_text_color(ctx, theme_fg());
     graphics_context_set_stroke_color(ctx, GColorLightGray);
 
     // Round this division up by adding (divisor - 1) to the dividend.
@@ -658,8 +684,11 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
 
         // emery: draw emphasized major/minor bottom-axis ticks for improved readability.
 #ifdef PBL_PLATFORM_EMERY
+        /* Цвета были прибиты гвоздями: на тёмной теме мелкие штрихи давали
+         * контраст 2.77 к чёрному, на светлой пропадали крупные. Берём из темы:
+         * штрих под подписью — основным цветом, промежуточные — приглушённым. */
         const bool is_label_tick = (i % entries_per_label) == 0;
-        const GColor tick_color = is_label_tick ? GColorLightGray : GColorDarkGray;
+        const GColor tick_color = is_label_tick ? theme_fg() : theme_dim();
         graphics_context_set_stroke_width(ctx, 1);
         graphics_context_set_stroke_color(ctx, tick_color);
         graphics_draw_line(ctx,
@@ -679,7 +708,7 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
         const int label_y = h - BOTTOM_AXIS_H - BOTTOM_AXIS_FONT_OFFSET;
         const int label_h = BOTTOM_AXIS_H;
         graphics_draw_text(ctx, buf,
-                           fonts_get_system_font(FONT_KEY_GOTHIC_14),
+                           ui_font_axis(),
                            GRect(label_x - 20, label_y, 40, label_h),
                            GTextOverflowModeWordWrap,
                            GTextAlignmentCenter,
@@ -706,7 +735,7 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
         const int label_y = h - BOTTOM_AXIS_H + EMERY_AXIS_LABEL_TOP;
         const int label_h = EMERY_AXIS_LABEL_H;
         graphics_draw_text(ctx, buf,
-                           fonts_get_system_font(FONT_KEY_GOTHIC_14),
+                           ui_font_axis(),
                            GRect(label_x - 20, label_y, 40, label_h),
                            GTextOverflowModeWordWrap,
                            GTextAlignmentCenter,
@@ -738,7 +767,9 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
     s_path_precip_top.num_points = num_entries;
     s_path_precip_top.points = s_points_precip;
     MEMORY_HEAP_PROBE_SAMPLE("before_precip_top_draw", &redraw_probe);
-    graphics_context_set_stroke_color(ctx, GColorPictonBlue);
+    /* Светлый голубой контур поверх заливки осадков на белом фоне давал
+     * контраст 2.27 — там, где кривая выходит из заливки, её было не видно. */
+    graphics_context_set_stroke_color(ctx, theme_readable(GColorPictonBlue));
     graphics_context_set_stroke_width(ctx, 1);
     gpath_draw_outline_open(ctx, &s_path_precip_top);
     MEMORY_HEAP_PROBE_SAMPLE("after_precip_top_draw", &redraw_probe);
@@ -747,8 +778,14 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
     {
         s_path_uv.num_points = num_entries;
         s_path_uv.points = s_points_uv;
-        graphics_context_set_stroke_color(ctx, PBL_IF_COLOR_ELSE(GColorYellow, GColorWhite));
+        graphics_context_set_stroke_color(ctx, PBL_IF_COLOR_ELSE(theme_warm(), GColorWhite));
+        // emery: a 1px line vanishes against the precipitation fill and the
+        // night hatching, so UV is drawn at the same weight as temperature.
+#ifdef PBL_PLATFORM_EMERY
+        graphics_context_set_stroke_width(ctx, 3);
+#else
         graphics_context_set_stroke_width(ctx, 1);
+#endif
         gpath_draw_outline_open(ctx, &s_path_uv);
     }
 
@@ -763,7 +800,8 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
 
     if (has_feels_like_data)
     {
-        graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(g_config->color_feels_like, GColorWhite));
+        graphics_context_set_fill_color(ctx,
+                PBL_IF_COLOR_ELSE(theme_readable(g_config->color_feels_like), GColorWhite));
         for (int i = 0; i < num_entries; ++i)
         {
             if (is_feels_like_available(feels_like_temps[i + data_offset]))
@@ -779,52 +817,108 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
     const int16_t axis_y = h - BOTTOM_AXIS_H;
     graphics_draw_line(ctx, GPoint(graph_bounds.origin.x, axis_y), GPoint(graph_bounds.origin.x + w, axis_y));
     // And for the left side axis
-    graphics_context_set_fill_color(ctx, GColorBlack);
+    graphics_context_set_fill_color(ctx, theme_bg());
     graphics_fill_rect(ctx, GRect(0, 0, s_axis_left_w, h - BOTTOM_AXIS_H), 0, GCornerNone); // Paint over plot bleeding
     graphics_draw_line(ctx, GPoint(graph_bounds.origin.x, 0), GPoint(graph_bounds.origin.x, axis_y));
     if (has_uv_data)
     {
         draw_uv_axis(ctx, graph_plot_rect);
     }
-    graphics_context_set_text_color(ctx, GColorWhite);
+    graphics_context_set_text_color(ctx, theme_fg());
+#ifdef PBL_PLATFORM_EMERY
+    // emery: the axis strip is only as tall as whatever the layout left for the
+    // graph, so the hi/lo labels pick a face that fits and are only drawn while
+    // they can sit clear of each other. Previously both were pinned to the strip
+    // edges and collided once the strip got short.
+    /* Цифры осей — служебная подпись, а не данные: 20 px спорили по весу с
+     * календарём и часами. */
+    GFont label_font = ui_font_axis();
+    GSize hi_size = temp_label_size_with_font(s_buffer_hi, label_font);
+    GSize lo_size = temp_label_size_with_font(s_buffer_lo, label_font);
+    const int strip_h = axis_y;
+    const int label_gap = 2;
+
+    if (hi_size.h + lo_size.h + label_gap > strip_h) {
+        // Axis numbers are digits only, so the compact system face is safe here
+        // even though it carries no Cyrillic.
+        label_font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
+        hi_size = temp_label_size_with_font(s_buffer_hi, label_font);
+        lo_size = temp_label_size_with_font(s_buffer_lo, label_font);
+    }
+
+    /* Раньше обе подписи прижимались к краям полосы, а не стояли там, где
+     * проходят сами максимум и минимум: рядом со шкалой УФ, у которой числа
+     * стоят строго на своих штрихах, это читалось как рассогласование двух
+     * шкал. Считаем те же координаты, что и точки графика. */
+    const int hi_line_y = MARGIN_TEMP_H;
+    const int lo_line_y = strip_h - MARGIN_TEMP_H;
+    int hi_y = hi_line_y - hi_size.h / 2;
+    int lo_y = lo_line_y - lo_size.h / 2;
+    bool draw_lo;
+
+    if (hi_y < 0) {
+        hi_y = 0;
+    }
+    if (lo_y > strip_h - lo_size.h) {
+        lo_y = strip_h - lo_size.h;
+    }
+    draw_lo = (lo_y >= hi_y + hi_size.h + label_gap);
+
+    graphics_draw_text(ctx, s_buffer_hi,
+                       label_font,
+                       GRect(0, hi_y, s_label_strip_w, hi_size.h),
+                       GTextOverflowModeFill, GTextAlignmentRight, NULL);
+    if (draw_lo) {
+        graphics_draw_text(ctx, s_buffer_lo,
+                           label_font,
+                           GRect(0, lo_y, s_label_strip_w, lo_size.h),
+                           GTextOverflowModeFill, GTextAlignmentRight, NULL);
+    }
+#else
     GSize hi_size = temp_label_string_size(s_buffer_hi);
     GSize lo_size = temp_label_string_size(s_buffer_lo);
-    // emery: anchor hi/lo labels to the top/bottom of the axis strip to avoid clipping.
-#ifdef PBL_PLATFORM_EMERY
-    const int hi_y = 0;
-    const int lo_y = axis_y - lo_size.h - 2;
-#else
     const int hi_y = -3;
     const int lo_y = 22;
-#endif
     graphics_draw_text(ctx, s_buffer_hi,
-                       fonts_get_system_font(FONT_KEY_GOTHIC_18),
+                       ui_font_20(),
                        GRect(0, hi_y, s_label_strip_w, hi_size.h),
                        GTextOverflowModeFill, GTextAlignmentRight, NULL);
     graphics_draw_text(ctx, s_buffer_lo,
-                       fonts_get_system_font(FONT_KEY_GOTHIC_18),
+                       ui_font_20(),
                        GRect(0, lo_y, s_label_strip_w, lo_size.h),
                        GTextOverflowModeFill, GTextAlignmentRight, NULL);
+#endif
     MEMORY_HEAP_PROBE_LOG_MIN(&redraw_probe);
     MEMORY_LOG_HEAP("forecast_update:exit");
 }
 
 static int temp_label_string_width(const char *text)
 {
-    const GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_18);
+    const GFont font = ui_font_axis();
     const GRect box = GRect(0, 0, TEMP_LABEL_MEASURE_BOX_W, TEMP_LABEL_MEASURE_BOX_H);
     const GSize sz = graphics_text_layout_get_content_size(text, font, box, GTextOverflowModeFill,
                                                            GTextAlignmentRight);
     return sz.w;
 }
 
-static GSize temp_label_string_size(const char *text)
+#ifdef PBL_PLATFORM_EMERY
+static GSize temp_label_size_with_font(const char *text, GFont font)
 {
-    const GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_18);
     const GRect box = GRect(0, 0, TEMP_LABEL_MEASURE_BOX_W, TEMP_LABEL_MEASURE_BOX_H);
     return graphics_text_layout_get_content_size(text, font, box, GTextOverflowModeFill,
                                                  GTextAlignmentRight);
 }
+#endif
+
+#ifndef PBL_PLATFORM_EMERY
+static GSize temp_label_string_size(const char *text)
+{
+    const GFont font = ui_font_20();
+    const GRect box = GRect(0, 0, TEMP_LABEL_MEASURE_BOX_W, TEMP_LABEL_MEASURE_BOX_H);
+    return graphics_text_layout_get_content_size(text, font, box, GTextOverflowModeFill,
+                                                 GTextAlignmentRight);
+}
+#endif
 
 static void text_labels_refresh()
 {
@@ -870,8 +964,13 @@ static void text_labels_refresh()
         }
     }
 
-    snprintf(s_buffer_hi, sizeof(s_buffer_hi), "%d", config_localize_temp(hi));
-    snprintf(s_buffer_lo, sizeof(s_buffer_lo), "%d", config_localize_temp(lo));
+    /* Знак градуса отделяет левую шкалу от правой: слева границы того, что
+     * нарисовано температурой (и кривая, и точки «ощущается как»), справа —
+     * индекс УФ, у которого своя шкала 0..11 и свои штрихи. Без пометки две
+     * шкалы читались как одна и «5» справа выглядело затесавшимся между
+     * «8» и «18» слева. */
+    snprintf(s_buffer_hi, sizeof(s_buffer_hi), "%d°", config_localize_temp(hi));
+    snprintf(s_buffer_lo, sizeof(s_buffer_lo), "%d°", config_localize_temp(lo));
 
     int content_w = temp_label_string_width(s_buffer_hi);
     const int w_lo = temp_label_string_width(s_buffer_lo);
@@ -911,6 +1010,12 @@ void forecast_layer_create(Layer *parent_layer, GRect frame)
 
 void forecast_layer_refresh()
 {
+    /* The forecast graph and the calendar now live on swipe-in screens that
+     * are created and destroyed at runtime, and app_message refreshes layers
+     * directly. Refreshing one that is not on screen must be a no-op. */
+    if (!s_forecast_layer) {
+        return;
+    }
     text_labels_refresh();
     layer_mark_dirty(s_forecast_layer);
 #ifdef FCW2_ENABLE_MEMORY_LOGGING
@@ -923,7 +1028,11 @@ void forecast_layer_refresh()
 
 void forecast_layer_destroy()
 {
+    if (!s_forecast_layer) {
+        return;
+    }
     MEMORY_LOG_HEAP("forecast_layer_destroy:before");
     layer_destroy(s_forecast_layer);
+    s_forecast_layer = NULL;
     MEMORY_LOG_HEAP("forecast_layer_destroy:after");
 }

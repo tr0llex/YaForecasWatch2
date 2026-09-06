@@ -1,184 +1,260 @@
 #include "weather_status_layer.h"
+#include <string.h>
+#include "c/appendix/ui_fonts.h"
 #include "c/appendix/persist.h"
 #include "c/appendix/config.h"
 #include "c/appendix/memory_log.h"
+#include "c/appendix/theme.h"
+#include "condition_icon.h"
 
-#define FONT_18_OFFSET 7
+/* Строка погоды: город слева, текущая температура со значком погоды по центру,
+ * время последнего обновления со значком обновления справа. Раньше здесь стояли
+ * два времени подряд — обновления и заката — и различить их было нельзя; время
+ * заката уехало в верхнюю строку, где рядом с ним рисуется стрелка вверх/вниз.
+ *
+ * Температура держится ровно по центру строки вместе со значком: это главное
+ * число здесь, и ищется оно взглядом по центру, а не по левому краю. */
+
 #define FONT_14_OFFSET 3
 #define CITY_INIT_WIDTH 100
-#define MARGIN 2
+/* MARGIN — внешнее поле строки, ROW_GAP — просвет между её элементами. */
+#define MARGIN 1
+#define ROW_GAP 4
+/* Значок погоды слева от температуры и значок обновления слева от времени. */
+#define COND_ICON_W 24
+/* Ширина рамки значка обновления: даёт кольцо радиусом 4. Мельче не делаем —
+ * на радиусе 3 разрыв в кольце не переживает растеризацию (см. комментарий у
+ * reload_icon_draw). */
+#define RELOAD_ICON_W 10
+/* Просвет между значком и временем. Раньше его не было вовсе: кольцо стояло к
+ * цифрам вплотную и читалось как ноль перед ними. */
+#define RELOAD_ICON_GAP 4
 #define FEELS_LIKE_UNAVAILABLE (-32767 - 1)
 
-// emery: use larger text and arrow geometry
-#ifdef PBL_PLATFORM_EMERY
-#define CITY_FONT_KEY FONT_KEY_GOTHIC_18
-#define SUN_EVENT_FONT_KEY FONT_KEY_GOTHIC_18
-#define ARROW_H 10
-#define ARROW_HEAD_H 4
-#define ARROW_HEAD_W 3
-#define ARROW_W 8
-#else
-#define CITY_FONT_KEY FONT_KEY_GOTHIC_14
-#define SUN_EVENT_FONT_KEY FONT_KEY_GOTHIC_14
-#define ARROW_H 8
-#define ARROW_HEAD_H 3
-#define ARROW_HEAD_W 2
-#define ARROW_W 6
-#endif
-
 static GRect frame_curr_temp;
-static GRect frame_sun_event;
+static GRect frame_updated;
 
 static Layer *s_weather_status_layer;
 static TextLayer *s_city_layer;
 static TextLayer *s_current_temp_layer;
-static TextLayer *s_next_sun_event_layer;
-
-static GPath *s_arrow_path = NULL;
-static const GPathInfo ARROW_PATH_INFO = {
-    // Downward facing arrow, centered at the origin
-    .num_points = 6,
-    .points = (GPoint[]){
-        {0, -ARROW_H/2},
-        {0, ARROW_H/2 - ARROW_HEAD_H},
-        {-ARROW_HEAD_W, ARROW_H/2 - ARROW_HEAD_H},
-        {0, ARROW_H/2},
-        {ARROW_HEAD_W, ARROW_H/2 - ARROW_HEAD_H},
-        {0, ARROW_H/2 - ARROW_HEAD_H}
-    }
-};
+static TextLayer *s_updated_layer;
 
 static void text_layer_move_frame(TextLayer *text_layer, GRect frame) {
     layer_set_frame(text_layer_get_layer(text_layer), frame);
 }
 
-static void city_layer_refresh() {
-    // Set the city text layer contents from storage
-    static char s_city_buffer[20];
-    persist_get_city(s_city_buffer, sizeof(s_city_buffer));
-    text_layer_set_text(s_city_layer, s_city_buffer);
-
-    // Dynamic resizing
-    GRect bounds = layer_get_bounds(s_weather_status_layer);
-    GSize size = text_layer_get_content_size(s_city_layer);
-    int x = frame_curr_temp.origin.x + frame_curr_temp.size.w + MARGIN * 2;
-    int y;
-    int h;
-    // emery: align city text baseline with 18px font metrics instead of 14px metrics.
 #ifdef PBL_PLATFORM_EMERY
-    y = -FONT_18_OFFSET;
-    h = size.h + FONT_18_OFFSET;
-#else
-    y = -FONT_14_OFFSET;
-    h = size.h + FONT_14_OFFSET;
+// emery: the legacy FONT_*_OFFSET constants encode the internal padding of the
+// system Gothic faces. Roboto pads differently, so the row is centred from the
+// measured height instead of a hand-tuned offset.
+static int emery_text_y(int band_h, int text_h) {
+    /* Измеренная высота — строчный бокс Roboto: чернила сидят в нём ниже
+     * середины, поэтому одной центровки бокса мало. Восьмая часть бокса — та же
+     * поправка, что в клетках календаря и в заголовке даты. */
+    const int y = (band_h - text_h) / 2 - text_h / 8;
+    return y < 0 ? 0 : y;
+}
 #endif
-    int w = bounds.size.w - frame_curr_temp.size.w - frame_sun_event.size.w - MARGIN * 4;
-    text_layer_move_frame(s_city_layer, GRect(x, y, w, h));
+
+/**
+ * Drop a trailing partial UTF-8 sequence.
+ *
+ * persist_read_string() truncates on a byte boundary, which for Cyrillic (two
+ * bytes per character) can leave half a character behind and render as garbage.
+ */
+static void trim_partial_utf8(char *text) {
+    int len = (int) strlen(text);
+    int i = len - 1;
+    int continuation = 0;
+
+    while (i >= 0 && ((unsigned char) text[i] & 0xC0) == 0x80) {
+        continuation += 1;
+        i -= 1;
+    }
+    if (i < 0) {
+        return;
+    }
+
+    const unsigned char lead = (unsigned char) text[i];
+    int expected = 0;
+    if ((lead & 0x80) == 0x00) expected = 0;
+    else if ((lead & 0xE0) == 0xC0) expected = 1;
+    else if ((lead & 0xF0) == 0xE0) expected = 2;
+    else if ((lead & 0xF8) == 0xF0) expected = 3;
+
+    if (continuation < expected) {
+        text[i] = '\0';
+    }
 }
 
+/** Temperature, centred in the row together with the weather icon. */
 static void current_temp_layer_refresh() {
     static char s_temp_buffer[16];
     int feels_like = persist_get_current_feels_like();
     if (g_config->show_feels_like && feels_like != FEELS_LIKE_UNAVAILABLE) {
-        snprintf(s_temp_buffer, sizeof(s_temp_buffer), "• %d (%d)",
+        /* Без знака градуса число читалось как ещё одна подпись оси. */
+        snprintf(s_temp_buffer, sizeof(s_temp_buffer), "%d° (%d°)",
             config_localize_temp(persist_get_current_temp()),
             config_localize_temp(feels_like));
     }
     else {
-        snprintf(s_temp_buffer, sizeof(s_temp_buffer), "• %d", config_localize_temp(persist_get_current_temp()));
+        snprintf(s_temp_buffer, sizeof(s_temp_buffer), "%d°",
+            config_localize_temp(persist_get_current_temp()));
     }
     text_layer_set_text(s_current_temp_layer, s_temp_buffer);
 
-    // Dynamic resizing
-    text_layer_move_frame(s_current_temp_layer, GRect(0, 0, 100, 100));  // Make it big so content doesn't get clipped
+    // Make it big so content doesn't get clipped, then shrink to the measurement.
+    text_layer_move_frame(s_current_temp_layer, GRect(0, 0, 100, 100));
     GSize size = text_layer_get_content_size(s_current_temp_layer);
-    text_layer_move_frame(s_current_temp_layer, GRect(MARGIN, -FONT_18_OFFSET, size.w, size.h));
-    frame_curr_temp = GRect(0, -FONT_18_OFFSET, size.w + MARGIN, size.h);
+    const GRect bounds = layer_get_bounds(s_weather_status_layer);
+#ifdef PBL_PLATFORM_EMERY
+    const int temp_y = emery_text_y(bounds.size.h, size.h);
+    const int icon_w = COND_ICON_W;
+#else
+    const int temp_y = -FONT_14_OFFSET;
+    const int icon_w = 0;
+#endif
+    /* По центру строки стоит группа «значок + число», а не одно число: иначе
+     * значок утаскивал видимый центр влево. */
+    int group_x = (bounds.size.w - (icon_w + size.w)) / 2;
+    if (group_x < MARGIN) {
+        group_x = MARGIN;
+    }
+
+    text_layer_move_frame(s_current_temp_layer, GRect(group_x + icon_w, temp_y, size.w, size.h));
+    frame_curr_temp = GRect(group_x, temp_y, icon_w + size.w, size.h);
 }
 
-static void sun_event_layer_refresh() {
-    GRect bounds = layer_get_bounds(s_weather_status_layer);
-    // Get the time of the first sun event
-    time_t first_sun_event_time;
-    persist_get_sun_event_times(&first_sun_event_time, 1);
-    struct tm *sun_time = localtime(&first_sun_event_time);
-
+/** Time of the last accepted weather payload, at the right edge. */
+static void updated_layer_refresh() {
     static char s_buffer[8];
-    config_format_time(s_buffer, 8, sun_time);
-
-    // Display this time on the TextLayer
-    text_layer_set_text(s_next_sun_event_layer, s_buffer);
-    // text_layer_set_text(s_next_sun_event_layer, "17:42");
-
-    // Dynamic resizing
-    text_layer_move_frame(s_next_sun_event_layer, GRect(0, 0, 100, 100));  // Make it big so content doesn't get clipped
-    GSize size = text_layer_get_content_size(s_next_sun_event_layer);
+    const time_t updated = persist_get_weather_updated();
+    const GRect bounds = layer_get_bounds(s_weather_status_layer);
+    struct tm *updated_tm;
+    GSize size;
     int y;
-    // emery: align sun-event text baseline with 18px font metrics instead of 14px metrics.
+
+    if (updated == 0) {
+        layer_set_hidden(text_layer_get_layer(s_updated_layer), true);
+        frame_updated = GRect(bounds.size.w - MARGIN, 0, 0, 0);
+        return;
+    }
+
+    layer_set_hidden(text_layer_get_layer(s_updated_layer), false);
+    updated_tm = localtime(&updated);
+    config_format_time(s_buffer, sizeof(s_buffer), updated_tm);
+    text_layer_set_text(s_updated_layer, s_buffer);
+
+    text_layer_move_frame(s_updated_layer, GRect(0, 0, 100, 100));
+    size = text_layer_get_content_size(s_updated_layer);
 #ifdef PBL_PLATFORM_EMERY
-    y = -FONT_18_OFFSET;
+    y = emery_text_y(bounds.size.h, size.h);
 #else
     y = -FONT_14_OFFSET;
 #endif
-    text_layer_move_frame(s_next_sun_event_layer,
-        GRect(bounds.size.w - MARGIN - ARROW_W - size.w, y, size.w + ARROW_W, size.h));
-    frame_sun_event = GRect(bounds.size.w - MARGIN - ARROW_W - size.w, y, size.w + ARROW_W + MARGIN, size.h);
+    /* frame_updated включает значок обновления и просвет за ним: город
+     * упирается в значок, а не в сам текст. */
+    const int lead = RELOAD_ICON_W + RELOAD_ICON_GAP;
+    frame_updated = GRect(bounds.size.w - MARGIN - size.w - lead, y,
+                          size.w + lead, size.h);
+    text_layer_move_frame(s_updated_layer,
+            GRect(frame_updated.origin.x + lead, y, size.w, size.h));
+}
+
+/** City name, left-aligned, truncated to whatever the row has left. */
+static void city_layer_refresh() {
+    // 48 bytes holds ~23 Cyrillic characters; Russian place names such as
+    // "Петропавловск-Камчатский" do not fit in the old 20-byte buffer.
+    static char s_city_buffer[48];
+    persist_get_city(s_city_buffer, sizeof(s_city_buffer));
+    s_city_buffer[sizeof(s_city_buffer) - 1] = '\0';
+    trim_partial_utf8(s_city_buffer);
+    text_layer_set_text(s_city_layer, s_city_buffer);
+
+    GRect bounds = layer_get_bounds(s_weather_status_layer);
+    GSize size = text_layer_get_content_size(s_city_layer);
+    int y;
+    int h;
+
+    (void) bounds;  /* используется только в ветке emery */
+#ifdef PBL_PLATFORM_EMERY
+    y = emery_text_y(bounds.size.h, size.h);
+    h = size.h;
+#else
+    y = -FONT_14_OFFSET;
+    h = size.h + FONT_14_OFFSET;
+#endif
+    /* Город занимает всё до центральной группы. Он же и уступает место, когда
+     * название длинное: обрезать имя города не так больно, как двигать
+     * температуру с центра. */
+    int w = frame_curr_temp.origin.x - MARGIN - ROW_GAP;
+    if (w < 0) {
+        w = 0;
+    }
+    text_layer_move_frame(s_city_layer, GRect(MARGIN, y, w, h));
 }
 
 static void weather_status_layer_init(GRect bounds) {
-    // Set up the city text layer properties
     int w = bounds.size.w;
 
     // Current temperature
-    s_current_temp_layer = text_layer_create(GRect(MARGIN, -FONT_18_OFFSET, 40, 25));
+    s_current_temp_layer = text_layer_create(GRect(MARGIN, 0, 40, 25));
     text_layer_set_background_color(s_current_temp_layer, GColorClear);
     text_layer_set_text_alignment(s_current_temp_layer, GTextAlignmentLeft);
-    text_layer_set_text_color(s_current_temp_layer, GColorWhite);
-    text_layer_set_font(s_current_temp_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+    text_layer_set_text_color(s_current_temp_layer, theme_fg());
+#ifdef PBL_PLATFORM_EMERY
+    // emery: the reading everyone actually looks for in this row, so it gets
+    // the only bold weight here.
+    text_layer_set_font(s_current_temp_layer, ui_font_bold_20());
+#else
+    text_layer_set_font(s_current_temp_layer, ui_font_20());
+#endif
 
     // City where weather was fetched
-    s_city_layer = text_layer_create(GRect(w/2 - CITY_INIT_WIDTH/2, -FONT_14_OFFSET, CITY_INIT_WIDTH, 25));
+    s_city_layer = text_layer_create(GRect(MARGIN, 0, CITY_INIT_WIDTH, 25));
     text_layer_set_background_color(s_city_layer, GColorClear);
-    text_layer_set_text_alignment(s_city_layer, GTextAlignmentCenter);
-    text_layer_set_text_color(s_city_layer, GColorWhite);
-    text_layer_set_font(s_city_layer, fonts_get_system_font(CITY_FONT_KEY));
+    text_layer_set_text_alignment(s_city_layer, GTextAlignmentLeft);
+    text_layer_set_text_color(s_city_layer, theme_dim());
+    text_layer_set_font(s_city_layer, ui_font_12());
+    // A name too wide for its share of the row gets an ellipsis rather than
+    // being sliced mid-glyph.
+    text_layer_set_overflow_mode(s_city_layer, GTextOverflowModeTrailingEllipsis);
 
-    // Time of next sun event (sunrise/sunset)
-    s_next_sun_event_layer = text_layer_create(GRect(w - MARGIN - 6 - 40, 4 - FONT_18_OFFSET, 40, 25));
-    text_layer_set_background_color(s_next_sun_event_layer, GColorClear);
-    text_layer_set_text_alignment(s_next_sun_event_layer, GTextAlignmentLeft);
-    text_layer_set_text_color(s_next_sun_event_layer, GColorWhite);
-    text_layer_set_font(s_next_sun_event_layer, fonts_get_system_font(SUN_EVENT_FONT_KEY));
+    // When the weather itself was last refreshed
+    s_updated_layer = text_layer_create(GRect(w - MARGIN - 40, 0, 40, 25));
+    text_layer_set_background_color(s_updated_layer, GColorClear);
+    text_layer_set_text_alignment(s_updated_layer, GTextAlignmentLeft);
+    text_layer_set_text_color(s_updated_layer, theme_dim());
+    text_layer_set_font(s_updated_layer, ui_font_12());
 
     current_temp_layer_refresh();
-    sun_event_layer_refresh();
+    updated_layer_refresh();
     city_layer_refresh();
 }
 
 static void weather_status_update_proc(Layer *layer, GContext *ctx) {
     MEMORY_LOG_HEAP("weather_status_update:enter");
-    GRect bounds = layer_get_bounds(layer);
-    int w = bounds.size.w;
-    if (!s_arrow_path) {
-        MEMORY_LOG_HEAP("weather_status_update:missing_arrow_path");
-        return;
-    }
-    // Translate to correct location in layer
-    if (persist_get_sun_event_start_type() == 0) {
-        gpath_rotate_to(s_arrow_path, TRIG_MAX_ANGLE / 2);
-    } else {
-        gpath_rotate_to(s_arrow_path, 0);
-    }
-    // emery: place arrow lower so it is vertically centered in the taller status row.
 #ifdef PBL_PLATFORM_EMERY
-    gpath_move_to(s_arrow_path, GPoint(w - 4, bounds.size.h - (ARROW_H / 2) - 4));
+    GRect bounds = layer_get_bounds(layer);
+    /* Осадки в значке рисуются до низа его рамки, поэтому рамку держим на пару
+     * пикселей выше строки — иначе капли упираются в график. */
+    const int icon_h = bounds.size.h - 4;
+    const int icon_y = (bounds.size.h - icon_h) / 2;
+
+    condition_icon_draw(ctx, GRect(frame_curr_temp.origin.x, icon_y, COND_ICON_W - 2, icon_h),
+                        persist_get_condition());
+
+    if (!layer_get_hidden(text_layer_get_layer(s_updated_layer))) {
+        /* Кольцо центруем по самому времени, а не по всей полосе: полоса выше
+         * строки, и по её центру значок вставал ниже цифр. */
+        reload_icon_draw(ctx, GRect(frame_updated.origin.x, frame_updated.origin.y,
+                                    RELOAD_ICON_W, frame_updated.size.h),
+                         theme_dim());
+    }
 #else
-    gpath_move_to(s_arrow_path, GPoint(w - 4, 6));
+    (void) layer;
+    (void) ctx;
 #endif
-    graphics_context_set_stroke_color(ctx, GColorWhite);
-    gpath_draw_outline_open(ctx, s_arrow_path);
-    graphics_context_set_fill_color(ctx, GColorWhite);
-    gpath_draw_filled(ctx, s_arrow_path);
     MEMORY_LOG_HEAP("weather_status_update:exit");
 }
 
@@ -186,28 +262,33 @@ void weather_status_layer_create(Layer* parent_layer, GRect frame) {
     s_weather_status_layer = layer_create(frame);
     GRect bounds = layer_get_bounds(s_weather_status_layer);
 
-    s_arrow_path = gpath_create(&ARROW_PATH_INFO);
-    if (!s_arrow_path) {
-        APP_LOG(APP_LOG_LEVEL_ERROR, "weather_status_layer_create: failed to allocate arrow path");
-    }
-
-    // Set up all the text layers
     weather_status_layer_init(bounds);
     layer_add_child(s_weather_status_layer, text_layer_get_layer(s_city_layer));
     layer_add_child(s_weather_status_layer, text_layer_get_layer(s_current_temp_layer));
-    layer_add_child(s_weather_status_layer, text_layer_get_layer(s_next_sun_event_layer));
+    layer_add_child(s_weather_status_layer, text_layer_get_layer(s_updated_layer));
     layer_set_update_proc(s_weather_status_layer, weather_status_update_proc);
 
-    // Add the weather status bar to its parent
     layer_add_child(parent_layer, s_weather_status_layer);
     MEMORY_LOG_HEAP("after_weather_status_layer_create");
 }
 
 void weather_status_layer_refresh() {
-    layer_mark_dirty(s_weather_status_layer);
+    if (!s_weather_status_layer) {
+        return;
+    }
+    // Colours are theme-dependent and set at create time, so they are
+    // re-applied here for the case where the theme changed since.
+    if (s_city_layer) {
+        text_layer_set_text_color(s_city_layer, theme_dim());
+        text_layer_set_text_color(s_current_temp_layer, theme_fg());
+        text_layer_set_text_color(s_updated_layer, theme_dim());
+    }
+    /* Порядок важен: город меряется от рамки температуры, значки рисуются от
+     * обеих рамок, поэтому перерисовку слоя просим последней. */
     current_temp_layer_refresh();
-    sun_event_layer_refresh();
+    updated_layer_refresh();
     city_layer_refresh();
+    layer_mark_dirty(s_weather_status_layer);
     MEMORY_LOG_HEAP("after_weather_refresh");
 }
 
@@ -215,11 +296,8 @@ void weather_status_layer_destroy() {
     MEMORY_LOG_HEAP("weather_status_layer_destroy:before");
     text_layer_destroy(s_city_layer);
     text_layer_destroy(s_current_temp_layer);
-    text_layer_destroy(s_next_sun_event_layer);
-    if (s_arrow_path) {
-        gpath_destroy(s_arrow_path);
-        s_arrow_path = NULL;
-    }
+    text_layer_destroy(s_updated_layer);
     layer_destroy(s_weather_status_layer);
+    s_weather_status_layer = NULL;
     MEMORY_LOG_HEAP("weather_status_layer_destroy:after");
 }
