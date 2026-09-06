@@ -129,6 +129,9 @@ void main_window_create() {
 }
 
 void main_window_refresh() {
+    if (!s_main_window) {
+        return;
+    }
 #ifdef PBL_PLATFORM_EMERY
     // The theme can change after the window was loaded, so the background is
     // repainted here rather than only in main_window_load().
@@ -144,6 +147,12 @@ void main_window_refresh() {
 }
 
 void main_window_destroy() {
+    /* Тик отписываем до сноса окна: обработчик красит слои, которые окно
+     * уносит с собой, и без отписки он продолжал бы приходить на уже снесённые.
+     * То же самое было с подпиской на связь в строке статуса. */
+    tick_timer_service_unsubscribe();
+
     // Interface for destroying the main window (implicitly unloads contents)
     window_destroy(s_main_window);
+    s_main_window = NULL;
 }
