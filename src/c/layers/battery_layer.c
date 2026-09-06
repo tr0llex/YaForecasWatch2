@@ -1,4 +1,6 @@
 #include "battery_layer.h"
+#include "c/appendix/theme.h"
+#include "c/services/backlight_tint.h"
 #include "c/appendix/persist.h"
 #include "c/appendix/memory_log.h"
 #include "c/services/watch_services.h"
@@ -18,23 +20,28 @@ static bool s_battery_subscribed;
 
 static void battery_state_handler(BatteryChargeState charge) {
     battery_layer_refresh();
+    // Same reasoning as the connection handler: one subscription per app.
+    backlight_tint_refresh();
 }
 
 #ifdef PBL_COLOR
 static GColor get_battery_color(int level) {
+    /* Зелёный и жёлтый на белом фоне давали контраст 1.6 и 1.2 — на солнце
+     * индикатор пропадал целиком. theme_readable() затемняет их до читаемых,
+     * оставляя тот же оттенок; на тёмной теме цвета не меняются. */
     if (level >= 50)
-        return GColorGreen;
+        return theme_readable(GColorGreen);
     else if (level >= 30)
-        return GColorYellow;
+        return theme_readable(GColorYellow);
     else
-        return GColorRed;
+        return theme_readable(GColorRed);
 }
 #endif
 
 static void ensure_battery_power_bitmap_loaded(void) {
     if (!s_battery_power_bitmap) {
         s_battery_power_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BATTERY_CHARGING);
-        s_battery_palette[0] = GColorWhite;
+        s_battery_palette[0] = theme_fg();
         s_battery_palette[1] = GColorClear;
         gbitmap_set_palette(s_battery_power_bitmap, s_battery_palette, false);
     }
@@ -84,7 +91,7 @@ static void battery_update_proc(Layer *layer, GContext *ctx) {
 #ifdef PBL_COLOR
     graphics_context_set_fill_color(ctx, get_battery_color(battery_level));
 #else
-    graphics_context_set_fill_color(ctx, GColorWhite);
+    graphics_context_set_fill_color(ctx, theme_fg());
 #endif
     graphics_fill_rect(ctx, color_area, 0, GCornerNone);
 
@@ -94,7 +101,7 @@ static void battery_update_proc(Layer *layer, GContext *ctx) {
     }
 
     // Draw the white battery outline
-    graphics_context_set_stroke_color(ctx, GColorWhite);
+    graphics_context_set_stroke_color(ctx, theme_fg());
     graphics_context_set_stroke_width(ctx, BATTERY_STROKE);
     graphics_draw_rect(ctx, GRect(battery_x, 0, battery_w, h));
 

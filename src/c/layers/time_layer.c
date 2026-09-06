@@ -1,13 +1,14 @@
 #include "time_layer.h"
+#include "c/appendix/ui_fonts.h"
 #include "c/appendix/config.h"
 #include "c/appendix/memory_log.h"
 #include "c/appendix/persist.h"
 #include "c/services/watch_services.h"
+#include "c/appendix/theme.h"
 
 // MT = Margin Top
 #define MT_TIME 14
 #define MT_AM_PM 7
-#define MT_TIME_LECO 2
 #define MT_AM_PM_LECO 2
 
 
@@ -22,8 +23,15 @@ static GColor debug_time_color() {
             return PBL_IF_COLOR_ELSE(GColorRed, GColorWhite);
         case DEBUG_WEATHER_STATE_OPENMETEO_TEMP:
             return PBL_IF_COLOR_ELSE(GColorYellow, GColorWhite);
-        default:
-            return PBL_IF_COLOR_ELSE(g_config->color_time, GColorWhite);
+        default: {
+            const GColor configured = PBL_IF_COLOR_ELSE(g_config->color_time, GColorWhite);
+            // The default clock colour is white, which disappears on the light
+            // theme; only an explicitly chosen colour overrides the theme.
+            if (gcolor_equal(configured, GColorWhite) || gcolor_equal(configured, GColorBlack)) {
+                return theme_fg();
+            }
+            return configured;
+        }
     }
 }
 
@@ -41,13 +49,13 @@ void time_layer_create(Layer* parent_layer, GRect frame) {
     text_layer_set_text_alignment(s_time_layer, GTextAlignmentLeft);
 
     // AM/PM formatting
-    text_layer_set_font(s_am_pm_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+    text_layer_set_font(s_am_pm_layer, ui_font_20());
     text_layer_set_background_color(s_am_pm_layer, GColorClear);
     text_layer_set_text_color(s_am_pm_layer, GColorWhite);
     text_layer_set_text(s_am_pm_layer, "PM");
     text_layer_set_text_alignment(s_am_pm_layer, GTextAlignmentLeft);
 
-    text_layer_set_font(s_error_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
+    text_layer_set_font(s_error_layer, ui_font_bold_24());
     text_layer_set_background_color(s_error_layer, GColorClear);
     text_layer_set_text_color(s_error_layer, PBL_IF_COLOR_ELSE(GColorRed, GColorWhite));
     text_layer_set_text(s_error_layer, "!");
@@ -70,6 +78,9 @@ static void text_layer_move_frame(TextLayer *text_layer, GRect frame) {
 }
 
 void time_layer_tick() {
+    if (!s_time_layer) {
+        return;
+    }
     // Get a tm structure
     struct tm tick_time = watch_services_localtime();
 
@@ -91,16 +102,24 @@ void time_layer_tick() {
 
     // Calculate some landmarks
     int content_w = time_size.w + (g_config->show_am_pm ? am_pm_size.w : 0);
+#ifdef PBL_PLATFORM_EMERY
+    // emery: the measured box spans ascent to descent, but the clock is digits
+    // only and never uses the descender. Centring the box therefore parks the
+    // visible digits low. Замерено по отрендеренному экрану на 78-пиксельном
+    // начертании: бокс 80 px, чернила 56 px, при подъёме на 3/20 бокса сверху
+    // и снизу остаётся поровну (восьмая давала 6/2, десятая — 8/0).
+    int text_h = time_size.h;
+    int text_top = (bounds.size.h - text_h) / 2 - time_size.h * 3 / 20;
+#else
     int text_h = time_size.h - MT_TIME; // Remove top margin, approximately
     int text_top = -MT_TIME + (bounds.size.h/2 - text_h/2);
+#endif
     int text_left = bounds.size.w / 2 - content_w / 2;
 
-    // emery: nudge LECO time text upward slightly to keep optical centering.
-#ifdef PBL_PLATFORM_EMERY
-    if (g_config->time_font == TIME_FONT_LECO) {
-        text_top -= MT_TIME_LECO;
-    }
-#endif
+    /* Правки для Leco здесь больше нет. Замер по снимку (tools/face-rows.py):
+     * с ней чернила ложились 9 px сверху и 13 снизу, то есть на два пикселя
+     * выше центра полосы; без неё выходит ровно 11/11. Общий подъём на 3/20
+     * бокса одинаково верен для всех трёх начертаний. */
 
     // Update layer positions and visibility
     text_layer_move_frame(s_time_layer, GRect(text_left, text_top, content_w, time_size.h));
@@ -132,7 +151,22 @@ void time_layer_tick() {
 }
 
 void time_layer_refresh() {
+    if (!s_time_layer) {
+        return;
+    }
+#ifdef PBL_PLATFORM_EMERY
+    // emery: pick the face from the band the layout actually handed us rather
+    // than from a global, so the two can never fall out of sync.
+    {
+        const GRect container = layer_get_bounds(text_layer_get_layer(s_container_layer));
+        text_layer_set_font(s_time_layer,
+                g_config->time_font == TIME_FONT_ROBOTO
+                    ? ui_font_clock_for_height(container.size.h)
+                    : config_time_font());
+    }
+#else
     text_layer_set_font(s_time_layer, config_time_font());
+#endif
     text_layer_set_text_color(s_time_layer, debug_time_color());
     time_layer_tick();  // Update main time text and layer positions
 }
@@ -143,5 +177,9 @@ void time_layer_destroy() {
     text_layer_destroy(s_am_pm_layer);
     text_layer_destroy(s_time_layer);
     text_layer_destroy(s_container_layer);
+    s_time_layer = NULL;
+    s_am_pm_layer = NULL;
+    s_error_layer = NULL;
+    s_container_layer = NULL;
     MEMORY_LOG_HEAP("time_layer_destroy:after");
 }
