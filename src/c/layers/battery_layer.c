@@ -132,6 +132,12 @@ void battery_layer_create(Layer* parent_layer, GRect frame) {
 }
 
 void battery_layer_refresh() {
+    /* Проверка как в остальных слоях: обновление приходит из app_message, а
+     * тот не знает, какие слои сейчас живы. Единственный слой без проверки —
+     * это ровно тот случай «App fault, PC: 0», который мы уже ловили. */
+    if (!s_battery_layer) {
+        return;
+    }
     layer_mark_dirty(s_battery_layer);
 }
 
@@ -146,5 +152,6 @@ void battery_layer_destroy() {
         s_battery_power_bitmap = NULL;
     }
     layer_destroy(s_battery_layer);
+    s_battery_layer = NULL;
     MEMORY_LOG_HEAP("battery_layer_destroy:after");
 }
