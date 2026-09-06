@@ -1037,13 +1037,18 @@ function clayTryDefaults() {
  * @returns {Object} Default Clay-compatible settings.
  */
 function getDefaultClaySettings() {
+    /* Значения по умолчанию — русские: циферблат русский, страница настроек
+     * русская, а из коробки он показывал градусы Фаренгейта, американские
+     * праздники и неделю с воскресенья. Свежая установка должна быть годной без
+     * четырёх правок руками. Провайдер — Open-Meteo: он единственный работает
+     * без ключа, который надо где-то получать. */
     return {
-        provider: 'wunderground',
+        provider: 'openmeteo',
         owmApiKey: '',
         yandexApiKey: '',
         fetch: false,
         location: '',
-        temperatureUnits: 'f',
+        temperatureUnits: 'c',
         dayNightShading: true,
         showFeelsLike: false,
         colorFeelsLike: DEFAULT_COLOR_YELLOW,
@@ -1052,7 +1057,7 @@ function getDefaultClaySettings() {
         axisTimeFormat: '24h',
         timeFont: 'roboto',
         colorTime: DEFAULT_COLOR_WHITE,
-        weekStartDay: 'sun',
+        weekStartDay: 'mon',
         firstWeek: 'prev',
         calendarWeeks: '2',
         faceTheme: 'dark',
@@ -1061,7 +1066,7 @@ function getDefaultClaySettings() {
         colorSunday: DEFAULT_COLOR_FOLLY,
         colorSaturday: DEFAULT_COLOR_FOLLY,
         colorUSFederal: DEFAULT_COLOR_FOLLY,
-        holidaySet1: String(holidays.HOLIDAY_SET_US),
+        holidaySet1: String(holidays.HOLIDAY_SET_RU),
         holidaySet2: String(holidays.HOLIDAY_SET_NONE),
         colorHoliday1: DEFAULT_COLOR_FOLLY,
         colorHoliday2: DEFAULT_COLOR_HOLIDAY_2,

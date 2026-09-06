@@ -128,7 +128,7 @@ var config = [
                 "type": "select",
                 "label": "Начало недели",
                 "messageKey": "weekStartDay",
-                "defaultValue": "sun",
+                "defaultValue": "mon",
                 "options": [
                     {
                         "label": "Воскресенье",
@@ -202,7 +202,7 @@ var config = [
                 "type": "select",
                 "label": "Набор праздников 1",
                 "messageKey": "holidaySet1",
-                "defaultValue": "1",
+                "defaultValue": "2",
                 "options": [
                     {
                         "label": "Нет",
@@ -281,7 +281,7 @@ var config = [
             },
             {
                 "type": "select",
-                "defaultValue": "f",
+                "defaultValue": "c",
                 "messageKey": "temperatureUnits",
                 "label": "Единицы температуры",
                 "options": [
@@ -320,7 +320,7 @@ var config = [
                 "type": "radiogroup",
                 "label": "Источник погоды",
                 "messageKey": "provider",
-                "defaultValue": "wunderground",
+                "defaultValue": "openmeteo",
                 "options": [
                     {
                         "label": "Weather Underground",
