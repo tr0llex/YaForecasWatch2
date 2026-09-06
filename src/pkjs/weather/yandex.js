@@ -568,11 +568,17 @@ YandexProvider.prototype.withProviderData = function(lat, lon, force, onSuccess,
             }
         }
 
+        /* Длину окна выставляем ДО заполнения: populateProviderFromCache в конце
+         * зовёт hasValidData(), а тот сверяет длину рядов с numEntries. Пока
+         * присваивание стояло ниже, сверка шла с прежними 24 часами, укороченный
+         * график всегда её проваливал — и вся эта ветка, написанная ради того,
+         * чтобы под утро вторых суток погода не пропадала, не работала ни разу. */
+        this.numEntries = windowTimes.length;
+
         if (!cache || !forecastCache.populateProviderFromCache(this, cache, windowTimes, 'yandex')) {
             handleYandexFailure({ stage: 'provider_data', code: 'yandex_insufficient_forecast' });
             return;
         }
-        this.numEntries = windowTimes.length;
 
         this.condition = typeof cache.condition === 'number' ? cache.condition : CONDITION.UNKNOWN;
         forecastCache.writeWeatherCache(YANDEX_WEATHER_CACHE_KEY, cache);
