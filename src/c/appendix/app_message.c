@@ -21,6 +21,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     Tuple *num_entries_tuple = dict_find(iterator, MESSAGE_KEY_NUM_ENTRIES);
     Tuple *current_temp_tuple = dict_find(iterator, MESSAGE_KEY_CURRENT_TEMP);
     Tuple *current_feels_like_tuple = dict_find(iterator, MESSAGE_KEY_CURRENT_FEELS_LIKE);
+    Tuple *condition_tuple = dict_find(iterator, MESSAGE_KEY_CONDITION);
     Tuple *city_tuple = dict_find(iterator, MESSAGE_KEY_CITY);
     Tuple *sun_events_tuple = dict_find(iterator, MESSAGE_KEY_SUN_EVENTS);
     Tuple *debug_fetch_error_tuple = dict_find(iterator, MESSAGE_KEY_DEBUG_FETCH_ERROR);
@@ -54,6 +55,8 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     Tuple *clay_day_night_shading_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_DAY_NIGHT_SHADING);
     Tuple *clay_show_feels_like_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_SHOW_FEELS_LIKE);
     Tuple *clay_color_feels_like_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_COLOR_FEELS_LIKE);
+    Tuple *clay_calendar_weeks_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_CALENDAR_WEEKS);
+    Tuple *clay_face_theme_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_FACE_THEME);
 
     if(temp_trend_tuple && precip_trend_tuple && uv_trend_tuple && forecast_start_tuple && num_entries_tuple
         && current_temp_tuple && city_tuple && sun_events_tuple) {
@@ -101,6 +104,11 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         time_t *sun_event_times = (time_t*) (sun_events_tuple->value->data + 1);
         persist_set_sun_event_start_type(sun_event_start_type);
         persist_set_sun_event_times(sun_event_times, 2);
+        /* Телефон времени обновления не присылает, а знать его полезно: когда
+         * провайдер молчит, на экране остаются старые цифры без всякой пометки.
+         * Момент приёма пакета — это и есть момент обновления. */
+        persist_set_condition(condition_tuple ? (int) condition_tuple->value->int32 : 0);
+        persist_set_weather_updated(time(NULL));
         loading_layer_refresh();
         forecast_layer_refresh();
         weather_status_layer_refresh();
@@ -162,6 +170,14 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         GColor color_holiday_2 = GColorFromHEX(clay_color_holiday_2_tuple->value->int32);
         GColor color_time = GColorFromHEX(clay_color_time_tuple->value->int32);
         GColor color_feels_like = GColorFromHEX(clay_color_feels_like_tuple->value->int32);
+        uint8_t calendar_weeks = clay_calendar_weeks_tuple
+            ? (uint8_t)clay_calendar_weeks_tuple->value->int32
+            : 2;
+        if (calendar_weeks != 2 && calendar_weeks != 3) calendar_weeks = 2;
+        uint8_t face_theme = clay_face_theme_tuple
+            ? (uint8_t)clay_face_theme_tuple->value->int32
+            : FACE_THEME_DARK;
+        if (face_theme > FACE_THEME_LIGHT) face_theme = FACE_THEME_DARK;
         Config config = (Config) {
             .celsius = clay_celsius,
             .time_lead_zero = time_lead_zero,
@@ -185,7 +201,9 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
             .holiday_set_1 = holiday_set_1,
             .holiday_set_2 = holiday_set_2,
             .color_holiday_1 = color_holiday_1,
-            .color_holiday_2 = color_holiday_2
+            .color_holiday_2 = color_holiday_2,
+            .calendar_weeks = calendar_weeks,
+            .face_theme = face_theme
         };
         persist_set_config(config);
         main_window_refresh();

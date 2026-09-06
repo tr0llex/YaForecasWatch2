@@ -11,5 +11,7 @@ module.exports = {
     REVERSE_GEOCODE_CACHE_KEY: 'reverseGeocodeCache',
     GEOCODE_BACKOFF_KEY: 'geocodeBackoff',
     YANDEX_WEATHER_CACHE_KEY: 'yandexWeatherCache',
+    YANDEX_DENIED_FIELDS_KEY: 'yandexDeniedFields',
+    YANDEX_BUDGET_KEY: 'yandexRequestBudget',
     OPEN_METEO_WEATHER_CACHE_KEY: 'openMeteoWeatherCache'
 };

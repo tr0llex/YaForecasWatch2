@@ -42,8 +42,12 @@ var KEY_GEOCODE_BACKOFF = storageKeys.GEOCODE_BACKOFF_KEY;
 var KEY_V1_34_0_WEEKEND_HOLIDAY_COLOR_MIGRATION = 'v1.34.0_weekend_holiday_color_migration';
 var KEY_UV_FIXTURE_CLEANUP = 'uv_fixture_cleanup_v1';
 var DEFAULT_WEATHER_REFRESH_MINUTES = 30;
-var YANDEX_WEATHER_REFRESH_MINUTES = 120;
-var OPEN_METEO_WEATHER_REFRESH_MINUTES = 120;
+/* Раз в час. Для Яндекса это 24 запроса в сутки при лимите бесплатного тарифа
+ * в 30 — остаток идёт на ручное «Обновить сейчас» и на дозапрос при смене
+ * города; когда он кончится, счётчик в yandex.js просто перестанет пускать
+ * запросы. За месяц выходит ~720 из 1000. */
+var YANDEX_WEATHER_REFRESH_MINUTES = 60;
+var OPEN_METEO_WEATHER_REFRESH_MINUTES = 60;
 var DEFAULT_FETCH_FAILURE_BACKOFF_MS = 5 * 60 * 1000;
 var YANDEX_FETCH_FAILURE_BACKOFF_MS = 60 * 60 * 1000;
 var OPEN_METEO_FETCH_FAILURE_BACKOFF_MS = 60 * 60 * 1000;
@@ -139,12 +143,63 @@ Pebble.addEventListener('appmessage', function(e) {
     }
 });
 
-Pebble.addEventListener('showConfiguration', function(e) {
-    // Set the userData here rather than in the Clay() constructor so it's actually up to date
+/* The Pebble config page can only hand data back by navigating to
+ * pebblejs://close#<payload>, so "save without closing" is not something the
+ * platform offers. The page's Apply button instead tags the payload with this
+ * key; we strip the tag, save as usual, and immediately reopen the page so the
+ * user lands back where they were. */
+var KEEP_OPEN_KEY = '_keepConfigOpen';
+
+/**
+ * Split a config-page payload into its keep-open flag and the clean response.
+ *
+ * @param {string} response Raw payload from the webviewclosed event.
+ * @returns {{keepOpen: boolean, response: string}} Flag and payload without the tag.
+ */
+function extractKeepOpen(response) {
+    var text;
+    var parsed;
+
+    if (typeof response !== 'string') {
+        return { keepOpen: false, response: response };
+    }
+
+    text = response.match(/^\{/) ? response : decodeURIComponent(response);
+
+    try {
+        parsed = JSON.parse(text);
+    }
+    catch (ex) {
+        return { keepOpen: false, response: response };
+    }
+
+    if (!parsed || typeof parsed !== 'object' || !(KEEP_OPEN_KEY in parsed)) {
+        return { keepOpen: false, response: response };
+    }
+
+    var flag = parsed[KEEP_OPEN_KEY];
+    var keepOpen = Boolean(flag && typeof flag === 'object' ? flag.value : flag);
+
+    delete parsed[KEEP_OPEN_KEY];
+
+    return { keepOpen: keepOpen, response: JSON.stringify(parsed) };
+}
+
+/**
+ * Reopen the configuration page with fresh userData.
+ *
+ * @returns {void}
+ */
+function openConfigPage() {
     clay.meta.userData.lastFetchSuccess = localStorage.getItem(KEY_LAST_FETCH_SUCCESS);
     clay.meta.userData.lastFetchAttempt = localStorage.getItem(KEY_LAST_FETCH_ATTEMPT);
     clay.meta.userData.debugWeatherLog = localStorage.getItem(KEY_DEBUG_WEATHER_LOG);
     Pebble.openURL(clay.generateUrl());
+}
+
+Pebble.addEventListener('showConfiguration', function(e) {
+    // userData is set here rather than in the Clay() constructor so it is current
+    openConfigPage();
     console.log('Showing clay: ' + JSON.stringify(getClaySettings()));
 });
 
@@ -153,7 +208,9 @@ Pebble.addEventListener('webviewclosed', function(e) {
         return;
     }
 
-    clay.getSettings(e.response, false);  // This triggers the update in localStorage
+    var applied = extractKeepOpen(e.response);
+
+    clay.getSettings(applied.response, false);  // This triggers the update in localStorage
     app.settings = getClaySettings();  // This reads from localStorage in sensible format
     app.telemetry = createTelemetryClient(getRuntimeTelemetryConfig());
     refreshProvider();
@@ -166,6 +223,10 @@ Pebble.addEventListener('webviewclosed', function(e) {
         fetch(app.provider, true, true);
     }
     console.log('Closing clay: ' + JSON.stringify(getClaySettings()));
+
+    if (applied.keepOpen) {
+        openConfigPage();
+    }
 });
 
 // Listen for when the watchface is opened
@@ -831,6 +892,8 @@ function sendClaySettings(onSuccess, onFailure) {
         "CLAY_COLOR_TODAY": app.settings.hasOwnProperty('colorToday') ? app.settings.colorToday : DEFAULT_COLOR_WHITE,
         "CLAY_START_MON": app.settings.weekStartDay === 'mon',
         "CLAY_PREV_WEEK": app.settings.firstWeek === 'prev',
+        "CLAY_CALENDAR_WEEKS": app.settings.calendarWeeks === '3' ? 3 : 2,
+        "CLAY_FACE_THEME": app.settings.faceTheme === 'light' ? 1 : 0,
         "CLAY_TIME_FONT": ['roboto', 'leco', 'bitham'].indexOf(app.settings.timeFont),
         "CLAY_SHOW_QT": app.settings.showQt,
         "CLAY_SHOW_BT": app.settings.btIcons === "connected" || app.settings.btIcons === "both",
@@ -982,6 +1045,9 @@ function getDefaultClaySettings() {
         colorTime: DEFAULT_COLOR_WHITE,
         weekStartDay: 'sun',
         firstWeek: 'prev',
+        calendarWeeks: '2',
+        faceTheme: 'dark',
+        configTheme: 'light',
         colorToday: 0,
         colorSunday: DEFAULT_COLOR_FOLLY,
         colorSaturday: DEFAULT_COLOR_FOLLY,
@@ -1230,11 +1296,16 @@ function getFixtureWeatherPayload(fixture) {
     provider.currentTemp = weather.currentTemp;
     provider.startTime = weather.startEpoch;
     provider.tempTrend = Array.isArray(weather.temps) ? weather.temps.slice(0) : [];
+    provider.currentFeelsLike = typeof weather.currentFeelsLike === 'number'
+        ? weather.currentFeelsLike
+        : null;
+    provider.feelsLikeTrend = Array.isArray(weather.feelsLike) ? weather.feelsLike.slice(0) : [];
     provider.precipTrend = Array.isArray(weather.precipPct) ? weather.precipPct.map(function(probabilityPercent) {
         return probabilityPercent / 100.0;
     }) : [];
     provider.uvTrend = Array.isArray(weather.uvIndex) ? weather.uvIndex.slice(0) : [];
     provider.sunEvents = sunEvents;
+    provider.condition = typeof weather.condition === 'number' ? weather.condition : 0;
 
     if (provider.numEntries <= 0 || sunEvents.length < 2 || !provider.hasValidData()) {
         console.log('[fixture] Invalid weather data in fixture ' + (fixture.name || '(unknown)'));

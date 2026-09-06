@@ -6,7 +6,7 @@ enum key {
     CURRENT_TEMP, BATTERY_LEVEL, CONFIG, UV_TREND, DEBUG_FETCH_ERROR,
     HOLIDAY_SLOT1_YEAR0, HOLIDAY_SLOT1_YEAR1, HOLIDAY_SLOT1_YEAR2,
     HOLIDAY_SLOT2_YEAR0, HOLIDAY_SLOT2_YEAR1, HOLIDAY_SLOT2_YEAR2,
-    DEBUG_WEATHER_STATE, FEELS_LIKE_TREND, CURRENT_FEELS_LIKE
+    DEBUG_WEATHER_STATE, FEELS_LIKE_TREND, CURRENT_FEELS_LIKE, WEATHER_UPDATED, CONDITION
 }; // Deprecated: BATTERY_LEVEL
 
 static int holiday_key(uint8_t slot, int16_t year) {
@@ -38,8 +38,8 @@ void persist_init() {
         persist_write_data(FEELS_LIKE_TREND, (void*) data, 12*sizeof(int16_t));
     }
     if (!persist_exists(PRECIP_TREND)) {
-        uint8_t data[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-        persist_write_data(PRECIP_TREND, (void*) data, 12*sizeof(uint8_t));
+        uint8_t data[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        persist_write_data(PRECIP_TREND, (void*) data, sizeof(data));
     }
     if (!persist_exists(UV_TREND)) {
         uint8_t data[] = {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255};
@@ -91,7 +91,9 @@ void persist_init() {
             .color_holiday_1 = GColorFolly,
             .color_holiday_2 = GColorVividCerulean,
             .show_feels_like = false,
-            .color_feels_like = GColorYellow
+            .color_feels_like = GColorYellow,
+            .calendar_weeks = 2,
+            .face_theme = FACE_THEME_DARK
         };
         persist_set_config(config);
     }
@@ -156,6 +158,14 @@ int persist_get_current_feels_like() {
 
 int persist_get_city(char *buffer, const size_t buffer_size) {
     return persist_read_string(CITY, buffer, buffer_size);
+}
+
+int persist_get_condition() {
+    return persist_read_int(CONDITION);
+}
+
+time_t persist_get_weather_updated() {
+    return (time_t) persist_read_int(WEATHER_UPDATED);
 }
 
 int persist_get_sun_event_start_type() {
@@ -252,6 +262,14 @@ void persist_set_current_feels_like(int val) {
 
 void persist_set_city(char *val) {
     persist_write_string(CITY, val);
+}
+
+void persist_set_condition(int val) {
+    persist_write_int(CONDITION, val);
+}
+
+void persist_set_weather_updated(time_t val) {
+    persist_write_int(WEATHER_UPDATED, (int32_t) val);
 }
 
 void persist_set_sun_event_start_type(int val) {
