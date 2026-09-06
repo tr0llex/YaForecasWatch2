@@ -1,14 +1,26 @@
 #include "calendar_layer.h"
+#include "c/appendix/ui_fonts.h"
+#include "c/appendix/theme.h"
 #include "c/appendix/config.h"
 #include "c/appendix/memory_log.h"
 #include "c/appendix/persist.h"
 #include "c/services/watch_services.h"
 #include <time.h>
 
+// emery: the row count is a user setting (two or three weeks), so the grid is
+// laid out at runtime. Other platforms keep the fixed three-row grid.
+#ifdef PBL_PLATFORM_EMERY
+#define NUM_WEEKS (calendar_grid_weeks())
+#define MAX_WEEKS 6
+#else
 #define NUM_WEEKS 3
+#define MAX_WEEKS 3
+#endif
 #define DAYS_PER_WEEK 7
 #define FONT_OFFSET 5
-#define EMERY_CALENDAR_TEXT_SHIFT_Y 5
+// Roboto reports its own vertical padding in the measured size, so the cell
+// text is centred on the measurement alone — no hand-tuned nudge.
+#define EMERY_CALENDAR_TEXT_SHIFT_Y 0
 #define EMERY_CALENDAR_TEXT_SHIFT_X 1
 
 // emery: render calendar dates with larger fonts
@@ -21,6 +33,21 @@
 #endif
 
 static Layer *s_calendar_layer;
+#ifdef PBL_PLATFORM_EMERY
+/** Row count for the grid, from the user setting. */
+static int calendar_grid_weeks(void) {
+    return config_calendar_weeks();
+}
+#endif
+
+/* Переопределение сетки (calendar_layer_set_grid) осталось от отдельного
+ * экрана календаря, который убрали вместе со свайпами: его никто не вызывал,
+ * а поля жили во всех сборках и мешали компилятору. */
+
+/** Index of today's cell. */
+static int calendar_index_of_today(void) {
+    return config_n_today();
+}
 
 typedef struct {
     bool slot_1;
@@ -28,11 +55,16 @@ typedef struct {
 } HolidayMatch;
 
 static GRect calendar_cell_rect(GRect bounds, int i) {
-    const int box_w = bounds.size.w / DAYS_PER_WEEK;
-    const int box_h = bounds.size.h / NUM_WEEKS;
-    return GRect((i % DAYS_PER_WEEK) * bounds.size.w / DAYS_PER_WEEK,
-                 (i / DAYS_PER_WEEK) * bounds.size.h / NUM_WEEKS,
-                 box_w, box_h);
+    /* Ширина клетки как w/7 теряла остаток от деления: семь колонок по 28 px
+     * занимали 196 из 200, и справа оставалась мёртвая полоса. Границы считаем
+     * от следующей колонки, так сетка ложится ровно во всю ширину. */
+    const int col = i % DAYS_PER_WEEK;
+    const int row = i / DAYS_PER_WEEK;
+    const int x0 = col * bounds.size.w / DAYS_PER_WEEK;
+    const int x1 = (col + 1) * bounds.size.w / DAYS_PER_WEEK;
+    const int y0 = row * bounds.size.h / NUM_WEEKS;
+    const int y1 = (row + 1) * bounds.size.h / NUM_WEEKS;
+    return GRect(x0, y0, x1 - x0, y1 - y0);
 }
 
 #ifdef PBL_PLATFORM_EMERY
@@ -53,7 +85,11 @@ static GRect calendar_text_rect(GRect cell_rect, const char *text, GFont font) {
     const GRect measure_box = GRect(0, 0, cell_rect.size.w, cell_rect.size.h);
     const GSize text_size = graphics_text_layout_get_content_size(
         text, font, measure_box, GTextOverflowModeFill, GTextAlignmentCenter);
-    const int text_top = cell_rect.origin.y + (cell_rect.size.h - text_size.h) / 2 - EMERY_CALENDAR_TEXT_SHIFT_Y;
+    /* Измеренная высота — это строчный бокс Roboto, а не сами чернила: при
+     * центровке по нему цифра садилась на 3 px ниже центра плашки «сегодня».
+     * Восьмая часть бокса как раз компенсирует нижний внутренний отступ. */
+    const int text_top = cell_rect.origin.y + (cell_rect.size.h - text_size.h) / 2
+                       - EMERY_CALENDAR_TEXT_SHIFT_Y - text_size.h / 8;
     return GRect(cell_rect.origin.x - emery_calendar_text_shift_x(text), text_top, cell_rect.size.w, text_size.h);
 }
 #else
@@ -139,24 +175,20 @@ static HolidayMatch holiday_match(struct tm *t) {
 
 #ifdef PBL_COLOR
 static GColor holiday_color(HolidayMatch match) {
+    /* Как и цвета выходных: настройка переживает смену темы, поэтому оттенок
+     * подтягивается до читаемого на текущем фоне. Запасной GColorWhite тоже
+     * заменён — на белой теме он был невидим. */
     if (match.slot_1) {
-        return g_config->color_holiday_1;
+        return theme_readable(g_config->color_holiday_1);
     }
     if (match.slot_2) {
-        return g_config->color_holiday_2;
+        return theme_readable(g_config->color_holiday_2);
     }
-    return GColorWhite;
+    return theme_fg();
 }
 
-static GRect holiday_highlight_rect(GRect cell_rect) {
-#ifdef PBL_PLATFORM_EMERY
-    // emery: keep the chip large enough for the larger calendar font.
-    return GRect(cell_rect.origin.x + 1, cell_rect.origin.y + 2, cell_rect.size.w - 2, cell_rect.size.h - 4);
-#else
-    return GRect(cell_rect.origin.x + 2, cell_rect.origin.y + 1, cell_rect.size.w - 4, cell_rect.size.h - 2);
-#endif
-}
-
+/* Split fill is still used for the "today" chip when today falls in both
+ * holiday sets, so it stays available on every platform. */
 static void fill_split_rect(GContext *ctx, GRect rect, GColor left_color, GColor right_color) {
     int left_w = rect.size.w / 2;
 
@@ -164,6 +196,13 @@ static void fill_split_rect(GContext *ctx, GRect rect, GColor left_color, GColor
     graphics_fill_rect(ctx, GRect(rect.origin.x, rect.origin.y, left_w, rect.size.h), 1, GCornersLeft);
     graphics_context_set_fill_color(ctx, right_color);
     graphics_fill_rect(ctx, GRect(rect.origin.x + left_w, rect.origin.y, rect.size.w - left_w, rect.size.h), 1, GCornersRight);
+}
+
+#ifndef PBL_PLATFORM_EMERY
+/* Emery tints the digit instead of drawing a chip behind holidays, so these
+ * two are only needed on the other platforms. */
+static GRect holiday_highlight_rect(GRect cell_rect) {
+    return GRect(cell_rect.origin.x + 2, cell_rect.origin.y + 1, cell_rect.size.w - 4, cell_rect.size.h - 2);
 }
 
 static void draw_holiday_highlight(GContext *ctx, GRect rect, HolidayMatch match) {
@@ -176,15 +215,18 @@ static void draw_holiday_highlight(GContext *ctx, GRect rect, HolidayMatch match
     graphics_fill_rect(ctx, rect, 1, GCornersAll);
 }
 #endif
+#endif  /* PBL_COLOR */
 
 #ifdef PBL_COLOR
 static GColor date_color(struct tm *t) {
-    // Get color for a date, considering weekends and holidays
+    /* Цвета выходных приходят из настроек и переживают смену темы: выбранный
+     * на тёмной теме светлый оттенок на белом фоне пропадал. theme_readable()
+     * подтягивает его до читаемого, сохраняя сам оттенок. */
     if (t->tm_wday == 0)
-        return g_config->color_sunday;
+        return theme_readable(g_config->color_sunday);
     if (t->tm_wday == 6)
-        return g_config->color_saturday;
-    return GColorWhite;
+        return theme_readable(g_config->color_saturday);
+    return theme_fg();
 }
 #endif
 
@@ -209,10 +251,18 @@ static void calendar_update_proc(Layer *layer, GContext *ctx) {
     const int box_h = h / NUM_WEEKS;
 
     // Calculate which box holds today's date
-    const int i_today = config_n_today();
+    const int i_today = calendar_index_of_today();
 
-    GRect today_rect = GRect((i_today % DAYS_PER_WEEK) * w / DAYS_PER_WEEK, (i_today / DAYS_PER_WEEK) * h / NUM_WEEKS,
-        box_w, box_h);
+    GRect today_rect = calendar_cell_rect(bounds, i_today);
+    (void) box_w;
+    (void) box_h;
+
+#ifdef PBL_PLATFORM_EMERY
+    /* Плашка занимала клетку целиком, поэтому в нижней строке подходила вплотную
+     * к часам, а в верхней — к цифрам соседнего ряда. Пара пикселей поля
+     * превращает её обратно в плашку. */
+    today_rect = grect_inset(today_rect, GEdgeInsets(2, 1));
+#endif
 
 #ifdef PBL_COLOR
     struct tm tm_today = relative_tm(0);
@@ -238,19 +288,29 @@ static void calendar_update_proc(Layer *layer, GContext *ctx) {
         bool highlight_saturday = (config_highlight_saturdays() && t.tm_wday == 6);
         bool bold = (i == i_today) || highlight_holiday || highlight_sunday || highlight_saturday;
 #ifdef PBL_COLOR
+#ifdef PBL_PLATFORM_EMERY
+        // emery: only "today" wears a filled chip. Holidays tint the digit
+        // itself, so the grid has one highlight idiom instead of two competing
+        // blocks of colour. Overlapping sets fall back to the slot-1 colour.
+        GColor text_color = (i == i_today) ? gcolor_legible_over(today_color())
+                                           : (highlight_holiday ? holiday_color(match) : date_color(&t));
+#else
         GColor text_color = (i == i_today) ? gcolor_legible_over(today_color())
                                            : (highlight_holiday ? gcolor_legible_over(holiday_color(match)) : date_color(&t));
+#endif
 #else
         GColor text_color = (i == i_today) ? GColorBlack : GColorWhite;
 #endif
         char buffer[4];
-        GFont font = fonts_get_system_font(bold ? CALENDAR_FONT_KEY_BOLD : CALENDAR_FONT_KEY);
         GRect cell_rect = calendar_cell_rect(bounds, i);
+        GFont font = ui_font_cal_for_height(cell_rect.size.h, bold);
 
 #ifdef PBL_COLOR
+#ifndef PBL_PLATFORM_EMERY
         if (i != i_today && highlight_holiday) {
             draw_holiday_highlight(ctx, holiday_highlight_rect(cell_rect), match);
         }
+#endif
 #endif
         graphics_context_set_text_color(ctx, text_color);
         graphics_draw_text(ctx,
@@ -270,6 +330,9 @@ void calendar_layer_create(Layer* parent_layer, GRect frame) {
 
 
 void calendar_layer_refresh() {
+    if (!s_calendar_layer) {
+        return;
+    }
     // Request redraw (of today's highlight)
     layer_mark_dirty(s_calendar_layer);
 }
@@ -277,5 +340,6 @@ void calendar_layer_refresh() {
 void calendar_layer_destroy() {
     MEMORY_LOG_HEAP("calendar_layer_destroy:before");
     layer_destroy(s_calendar_layer);
+    s_calendar_layer = NULL;
     MEMORY_LOG_HEAP("calendar_layer_destroy:after");
 }

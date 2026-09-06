@@ -4,6 +4,7 @@ var CACHE_VERSION = 'v1';
 var CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 var BITSET_BYTES = 46;
 var NAGER_BASE_URL = 'https://date.nager.at/api/v3/PublicHolidays/';
+var ruCalendar = require('./ru-production-calendar.js');
 
 var HOLIDAY_SET_NONE = 0;
 var HOLIDAY_SET_US = 1;
@@ -240,6 +241,26 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
         }
         onReady([], { status: 'disabled' });
         return;
+    }
+
+    if (holidaySet === HOLIDAY_SET_RU) {
+        // The Russian production calendar includes day-off transfers that
+        // Nager.Date does not publish, so built-in data wins where we have it.
+        var builtIn = ruCalendar.datesForYear(year);
+        if (builtIn) {
+            if (typeof debugLog === 'function') {
+                debugLog('holiday_builtin_ru', {
+                    year: year,
+                    dates: builtIn.length,
+                    provisional: ruCalendar.isProvisional(year)
+                });
+            }
+            onReady(builtIn, {
+                status: 'builtin',
+                provisional: ruCalendar.isProvisional(year)
+            });
+            return;
+        }
     }
 
     key = cacheKey(source.countryCode, source.scope, year);
