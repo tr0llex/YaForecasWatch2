@@ -219,6 +219,9 @@ void calendar_status_layer_create(Layer* parent_layer, GRect frame) {
 
 void bluetooth_icons_refresh(bool connected) {
     (void)connected;
+    if (!s_calendar_status_layer) {
+        return;
+    }
     layer_mark_dirty(s_calendar_status_layer);
 }
 
@@ -227,7 +230,9 @@ void bluetooth_callback(bool connected) {
     // This app owns the single connection subscription, so the backlight tint
     // is refreshed from here rather than by subscribing a second time.
     backlight_tint_refresh();
-    if (!connected && g_config->vibe)
+    /* g_config обнуляется при выгрузке раньше, чем система перестаёт слать
+     * события связи, поэтому проверяем и его тоже. */
+    if (!connected && g_config && g_config->vibe)
         vibes_double_pulse();
 }
 
@@ -266,6 +271,10 @@ void calendar_status_layer_refresh() {
 
 void calendar_status_layer_destroy() {
     MEMORY_LOG_HEAP("calendar_status_layer_destroy:before");
+    /* Подписка на связь заводится в create, а сниматься забывали: обработчик
+     * оставался жить и после сноса слоя — а он этот слой красит. Батарея
+     * отписывается ровно так же, это было просто пропущено. */
+    connection_service_unsubscribe();
     battery_layer_destroy();
     if (s_mute_bitmap) {
         gbitmap_destroy(s_mute_bitmap);
