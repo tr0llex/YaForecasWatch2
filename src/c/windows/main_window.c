@@ -66,12 +66,12 @@ static void main_window_load(Window *window) {
     loading_layer_create(window_layer,
             GRect(0, h - FORECAST_HEIGHT - WEATHER_STATUS_HEIGHT, w, FORECAST_HEIGHT + WEATHER_STATUS_HEIGHT));
 #endif
-#ifdef PBL_PLATFORM_EMERY
-    app_message_send_startup_state(true);
-#else
+    /* Раньше на emery заметка «Нет данных» оставалась поверх погоды и графика
+     * до первого тика — до минуты с валидными данными в памяти, — а телефону
+     * безусловно сообщалось, что данные есть, и стартовая загрузка не
+     * запускалась. Спрашиваем хранилище, как и на остальных платформах. */
     loading_layer_refresh();
     app_message_send_startup_state(!loading_layer_needs_refresh());
-#endif
     MEMORY_LOG_HEAP("after_window_load");
 }
 
