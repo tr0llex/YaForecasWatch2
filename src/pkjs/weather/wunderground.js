@@ -1,6 +1,48 @@
 var WeatherProvider = require('./provider.js');
 var request = WeatherProvider.request;
 
+var CONDITION = WeatherProvider.CONDITION;
+
+/* The Weather Company icon codes, as used by both the hourly forecast
+ * (icon_code) and the current observation (iconCode). Only the groups the
+ * watch can draw are listed; anything else stays unknown and no icon is
+ * drawn. */
+var WU_ICON_CONDITIONS = {
+    0: CONDITION.THUNDERSTORM, 1: CONDITION.THUNDERSTORM, 2: CONDITION.THUNDERSTORM,
+    3: CONDITION.THUNDERSTORM, 4: CONDITION.THUNDERSTORM,
+    5: CONDITION.SNOW, 6: CONDITION.SNOW, 7: CONDITION.SNOW,
+    8: CONDITION.RAIN, 9: CONDITION.RAIN, 10: CONDITION.RAIN,
+    11: CONDITION.RAIN, 12: CONDITION.RAIN,
+    13: CONDITION.SNOW, 14: CONDITION.SNOW, 15: CONDITION.SNOW, 16: CONDITION.SNOW,
+    17: CONDITION.SNOW, 18: CONDITION.SNOW,
+    19: CONDITION.FOG, 20: CONDITION.FOG, 21: CONDITION.FOG, 22: CONDITION.FOG,
+    23: CONDITION.CLOUDY, 24: CONDITION.CLOUDY, 25: CONDITION.CLOUDY,
+    26: CONDITION.CLOUDY, 27: CONDITION.CLOUDY, 28: CONDITION.CLOUDY,
+    29: CONDITION.PARTLY_CLOUDY, 30: CONDITION.PARTLY_CLOUDY,
+    31: CONDITION.CLEAR, 32: CONDITION.CLEAR, 33: CONDITION.CLEAR, 34: CONDITION.CLEAR,
+    35: CONDITION.RAIN, 36: CONDITION.CLEAR,
+    37: CONDITION.THUNDERSTORM, 38: CONDITION.THUNDERSTORM,
+    39: CONDITION.RAIN, 40: CONDITION.RAIN,
+    41: CONDITION.SNOW, 42: CONDITION.SNOW, 43: CONDITION.SNOW,
+    45: CONDITION.RAIN, 46: CONDITION.SNOW, 47: CONDITION.THUNDERSTORM
+};
+
+/**
+ * Map a Weather Company icon code onto the shared condition set.
+ *
+ * @param {*} iconCode Icon code from the API.
+ * @returns {number} Shared condition code.
+ */
+function wuCondition(iconCode) {
+    if (typeof iconCode !== 'number' || !isFinite(iconCode)) {
+        return CONDITION.UNKNOWN;
+    }
+
+    return Object.prototype.hasOwnProperty.call(WU_ICON_CONDITIONS, iconCode)
+        ? WU_ICON_CONDITIONS[iconCode]
+        : CONDITION.UNKNOWN;
+}
+
 var WundergroundProvider = function() {
     this._super.call(this);
     this.name = 'Weather Underground';
@@ -73,6 +115,9 @@ WundergroundProvider.prototype.withWundergroundCurrent = function(lat, lon, apiK
                 temp: weatherData.temperature,
                 feelsLike: typeof weatherData.temperatureFeelsLike === 'number'
                     ? weatherData.temperatureFeelsLike
+                    : null,
+                iconCode: typeof weatherData.iconCode === 'number'
+                    ? weatherData.iconCode
                     : null
             });
         }).bind(this),
@@ -172,6 +217,7 @@ WundergroundProvider.prototype.withApiKey = function(callback, onFailure) {
 WundergroundProvider.prototype.withProviderData = function(lat, lon, force, onSuccess, onFailure) {
     // onSuccess expects that this.hasValidData() will be true
     var currentTemp;
+    var currentIconCode = null;
     var forecast;
     var uvData;
     var currentReady = false;
@@ -231,12 +277,18 @@ WundergroundProvider.prototype.withProviderData = function(lat, lon, force, onSu
             });
             this.startTime = forecast[0].fcst_valid;
             this.currentTemp = currentTemp;
+            /* The observation carries the condition now; the first forecast
+             * hour is the fallback when it does not. */
+            this.condition = currentIconCode !== null
+                ? wuCondition(currentIconCode)
+                : wuCondition(forecast[0].icon_code);
             onSuccess();
         }).bind(this);
 
         this.withWundergroundCurrent(lat, lon, apiKey, function(value) {
             currentTemp = value.temp;
             this.currentFeelsLike = value.feelsLike;
+            currentIconCode = value.iconCode;
             currentReady = true;
             complete();
         }.bind(this), failOnce);
