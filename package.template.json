@@ -1,7 +1,7 @@
 {
   "name": "pogodnik",
   "author": "Alexey Samoylov",
-  "version": "2.1.3",
+  "version": "2.1.4",
   "buildProfile": "{{buildProfile}}",
   "keywords": [
     "pebble-app"
