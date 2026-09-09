@@ -51,7 +51,6 @@ void time_layer_create(Layer* parent_layer, GRect frame) {
     // AM/PM formatting
     text_layer_set_font(s_am_pm_layer, ui_font_20());
     text_layer_set_background_color(s_am_pm_layer, GColorClear);
-    text_layer_set_text_color(s_am_pm_layer, GColorWhite);
     text_layer_set_text(s_am_pm_layer, "PM");
     text_layer_set_text_alignment(s_am_pm_layer, GTextAlignmentLeft);
 
@@ -167,7 +166,11 @@ void time_layer_refresh() {
 #else
     text_layer_set_font(s_time_layer, config_time_font());
 #endif
-    text_layer_set_text_color(s_time_layer, debug_time_color());
+    /* AM/PM is part of the same reading as the digits, so it takes the same
+     * colour. It used to be pinned to white and vanished on the light theme. */
+    const GColor clock_color = debug_time_color();
+    text_layer_set_text_color(s_time_layer, clock_color);
+    text_layer_set_text_color(s_am_pm_layer, clock_color);
     time_layer_tick();  // Update main time text and layer positions
 }
 
