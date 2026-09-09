@@ -99,8 +99,15 @@ static void minute_handler(struct tm *tick_time, TimeUnits units_changed) {
         calendar_layer_refresh();
         calendar_status_layer_refresh();
     }
+    /* Значок «не беспокоить» службы событий не имеет — он только опрашивается,
+     * и включается-выключается по расписанию. Ежеминутная перерисовка строки
+     * состояния нужна ради него; связь и заряд приходят событиями. */
     status_icons_refresh();
-    loading_layer_refresh();
+    /* Заметка «Нет данных» на тик не подписана намеренно. Она смотрит только
+     * на то, есть ли прогноз в памяти, а это меняется в одном месте — когда
+     * приходит погода, и оттуда же слой и обновляется. Ежеминутный опрос стоил
+     * четырёх чтений хранилища, то есть почти шести тысяч обращений к флешу за
+     * сутки ради ответа, который между ними не меняется. */
 #ifdef PBL_PLATFORM_EMERY
     backlight_tint_refresh();
 #endif
@@ -144,6 +151,8 @@ void main_window_refresh() {
     forecast_layer_refresh();
     calendar_layer_refresh();
     calendar_status_layer_refresh();
+    /* Заметка тоже красится темой, а тема меняется здесь. */
+    loading_layer_refresh();
 }
 
 void main_window_destroy() {
