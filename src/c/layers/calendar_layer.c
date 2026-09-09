@@ -71,7 +71,8 @@ static GRect calendar_cell_rect(GRect bounds, int i) {
 // Apply a tiny Emery-only horizontal tweak for two-digit dates that start with "1"
 // to ensure they stay visually centered within calendar boxes.
 static int emery_calendar_text_shift_x(const char *text) {
-    if (text[1] != '\0' && text[0] == '1') {
+    /* Порядок проверок важен: на пустой строке text[1] лежит за концом. */
+    if (text[0] == '1' && text[1] != '\0') {
         return EMERY_CALENDAR_TEXT_SHIFT_X;
     }
 
@@ -136,19 +137,66 @@ static int day_of_year(struct tm *t) {
     return day;
 }
 
+/* Набор праздников на время одной отрисовки.
+ *
+ * Прежде holiday_year_has_day() читала его с флеша заново на каждую клетку и
+ * каждый из двух слотов: на сетке в шесть недель это около двухсот пятидесяти
+ * обращений к хранилищу за одну перерисовку календаря. Сетка охватывает от силы
+ * два календарных года, и набор за год — полсотни байт, так что держать их
+ * рядом дешевле любого повторного чтения.
+ *
+ * Кеш живёт ровно один проход отрисовки: сбрасывается в начале update_proc,
+ * потому что между проходами телефон мог прислать новый набор. */
+#define HOLIDAY_CACHE_SLOTS 4
+
+typedef struct {
+    uint8_t slot;
+    int16_t year;
+    bool valid;
+    HolidayYear data;
+} HolidayCacheEntry;
+
+static HolidayCacheEntry s_holiday_cache[HOLIDAY_CACHE_SLOTS];
+static int s_holiday_cache_used;
+
+static void holiday_cache_reset(void) {
+    s_holiday_cache_used = 0;
+}
+
+/** Набор за год, читая с флеша не более одного раза на пару (слот, год). */
+static const HolidayYear *holiday_cache_get(uint8_t slot, int16_t year) {
+    for (int i = 0; i < s_holiday_cache_used; ++i) {
+        if (s_holiday_cache[i].slot == slot && s_holiday_cache[i].year == year) {
+            return s_holiday_cache[i].valid ? &s_holiday_cache[i].data : NULL;
+        }
+    }
+
+    if (s_holiday_cache_used >= HOLIDAY_CACHE_SLOTS) {
+        /* Больше четырёх пар сетка дать не может: два слота на два года. */
+        return NULL;
+    }
+
+    HolidayCacheEntry *entry = &s_holiday_cache[s_holiday_cache_used++];
+    entry->slot = slot;
+    entry->year = year;
+    entry->valid = persist_get_holiday_year(slot, year, &entry->data);
+    return entry->valid ? &entry->data : NULL;
+}
+
 static bool holiday_year_has_day(uint8_t slot, uint8_t holiday_set, struct tm *t) {
-    HolidayYear holiday_year;
+    const HolidayYear *holiday_year;
     int bit_index;
 
     if (holiday_set == HOLIDAY_SET_NONE) {
         return false;
     }
 
-    if (!persist_get_holiday_year(slot, (int16_t)(t->tm_year + 1900), &holiday_year)) {
+    holiday_year = holiday_cache_get(slot, (int16_t)(t->tm_year + 1900));
+    if (!holiday_year) {
         return false;
     }
 
-    if (holiday_year.holiday_set != holiday_set) {
+    if (holiday_year->holiday_set != holiday_set) {
         return false;
     }
 
@@ -157,7 +205,7 @@ static bool holiday_year_has_day(uint8_t slot, uint8_t holiday_set, struct tm *t
         return false;
     }
 
-    return (holiday_year.bits[bit_index / 8] & (1 << (bit_index % 8))) != 0;
+    return (holiday_year->bits[bit_index / 8] & (1 << (bit_index % 8))) != 0;
 }
 
 static HolidayMatch holiday_match(struct tm *t) {
@@ -244,6 +292,8 @@ static GColor today_color() {
 }
 
 static void calendar_update_proc(Layer *layer, GContext *ctx) {
+    holiday_cache_reset();
+
     GRect bounds = layer_get_bounds(layer);
     int w = bounds.size.w;
     int h = bounds.size.h;
@@ -339,7 +389,9 @@ void calendar_layer_refresh() {
 
 void calendar_layer_destroy() {
     MEMORY_LOG_HEAP("calendar_layer_destroy:before");
-    layer_destroy(s_calendar_layer);
+    if (s_calendar_layer) {
+        layer_destroy(s_calendar_layer);
+    }
     s_calendar_layer = NULL;
     MEMORY_LOG_HEAP("calendar_layer_destroy:after");
 }
