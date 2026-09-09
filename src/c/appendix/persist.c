@@ -10,7 +10,11 @@ enum key {
 }; // Deprecated: BATTERY_LEVEL
 
 static int holiday_key(uint8_t slot, int16_t year) {
-    const int16_t bucket = (int16_t)(year % 3);
+    /* Остаток от деления отрицательного числа в C отрицателен, и ключ уезжал
+     * НИЖЕ начала слота — в соседнюю запись. Год приходит с телефона, и там его
+     * никто не обещал держать разумным: сорок шесть байт набора праздников
+     * ложились поверх отладочного флага. Приводим остаток к неотрицательному. */
+    const int16_t bucket = (int16_t)(((year % 3) + 3) % 3);
 
     if (slot == 1) {
         return HOLIDAY_SLOT1_YEAR0 + bucket;

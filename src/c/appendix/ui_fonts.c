@@ -26,18 +26,27 @@ void ui_fonts_load(void) {
     s_cal_small_bold = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_CAL_BOLD_18));
 }
 
+/* Выгружаем только то, что загрузилось. Геттеры ниже не зря проверяют каждый
+ * шрифт на NULL: загрузка ресурса может не удаться, — а выгрузка отдавала этот
+ * же NULL в SDK. */
+static void prv_unload(GFont font) {
+    if (font) {
+        fonts_unload_custom_font(font);
+    }
+}
+
 void ui_fonts_unload(void) {
-    fonts_unload_custom_font(s_clock_xl);
-    fonts_unload_custom_font(s_bold_24);
-    fonts_unload_custom_font(s_bold_16);
-    fonts_unload_custom_font(s_20);
-    fonts_unload_custom_font(s_bold_20);
-    fonts_unload_custom_font(s_axis);
-    fonts_unload_custom_font(s_12);
-    fonts_unload_custom_font(s_cal);
-    fonts_unload_custom_font(s_cal_bold);
-    fonts_unload_custom_font(s_cal_small);
-    fonts_unload_custom_font(s_cal_small_bold);
+    prv_unload(s_clock_xl);
+    prv_unload(s_bold_24);
+    prv_unload(s_bold_16);
+    prv_unload(s_20);
+    prv_unload(s_bold_20);
+    prv_unload(s_axis);
+    prv_unload(s_12);
+    prv_unload(s_cal);
+    prv_unload(s_cal_bold);
+    prv_unload(s_cal_small);
+    prv_unload(s_cal_small_bold);
     s_clock_xl = s_bold_24 = s_bold_16 = s_20 = s_bold_20 = s_axis = s_12 = NULL;
     s_cal = s_cal_bold = s_cal_small = s_cal_small_bold = NULL;
 }

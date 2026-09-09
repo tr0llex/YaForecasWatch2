@@ -131,7 +131,12 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         };
         uint8_t slot = (uint8_t)holiday_slot_tuple->value->int32;
 
-        if (holiday_bits_tuple->length == HOLIDAY_BITSET_BYTES && (slot == 1 || slot == 2)) {
+        /* Год проверяется наравне со слотом и длиной: он выбирает, в какую из
+         * трёх ячеек слота лечь, и мусор в нём — это запись не туда. Границы
+         * взяты с запасом вокруг того, что вообще может прислать календарь. */
+        const bool year_sane = holiday_year.year >= 2000 && holiday_year.year <= 2100;
+        if (holiday_bits_tuple->length == HOLIDAY_BITSET_BYTES
+            && (slot == 1 || slot == 2) && year_sane) {
             memcpy(holiday_year.bits, holiday_bits_tuple->value->data, HOLIDAY_BITSET_BYTES);
             persist_set_holiday_year(slot, &holiday_year);
             calendar_layer_refresh();

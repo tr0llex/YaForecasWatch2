@@ -67,8 +67,14 @@ void loading_layer_refresh() {
 
 void loading_layer_destroy() {
     MEMORY_LOG_HEAP("loading_layer_destroy:before");
-    text_layer_destroy(s_loading_text_layer);
-    layer_destroy(s_loading_layer);
+    /* Как и в остальных слоях: разрушение может прийти после неудачного
+     * создания, и отдавать NULL в SDK нельзя. */
+    if (s_loading_text_layer) {
+        text_layer_destroy(s_loading_text_layer);
+    }
+    if (s_loading_layer) {
+        layer_destroy(s_loading_layer);
+    }
     s_loading_layer = NULL;
     s_loading_text_layer = NULL;
     MEMORY_LOG_HEAP("loading_layer_destroy:after");
