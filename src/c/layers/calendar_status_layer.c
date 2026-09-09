@@ -3,7 +3,6 @@
 #include "c/appendix/config.h"
 #include "c/appendix/persist.h"
 #include "c/appendix/i18n.h"
-#include "c/services/backlight_tint.h"
 #include "c/appendix/theme.h"
 #include "c/appendix/ui_fonts.h"
 #include "c/appendix/memory_log.h"
@@ -233,9 +232,6 @@ void bluetooth_icons_refresh(bool connected) {
 
 void bluetooth_callback(bool connected) {
     bluetooth_icons_refresh(connected);
-    // This app owns the single connection subscription, so the backlight tint
-    // is refreshed from here rather than by subscribing a second time.
-    backlight_tint_refresh();
     /* g_config обнуляется при выгрузке раньше, чем система перестаёт слать
      * события связи, поэтому проверяем и его тоже. */
     if (!connected && g_config && g_config->vibe)

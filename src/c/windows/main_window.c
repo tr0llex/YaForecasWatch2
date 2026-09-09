@@ -7,7 +7,6 @@
 #include "c/layers/calendar_status_layer.h"
 #include "c/layers/loading_layer.h"
 #include "c/appendix/theme.h"
-#include "c/services/backlight_tint.h"
 #include "c/appendix/app_message.h"
 #include "c/appendix/config.h"
 #include "c/appendix/persist.h"
@@ -49,8 +48,6 @@ static void main_window_load(Window *window) {
     calendar_status_layer_create(window_layer, l.status);
     loading_layer_create(window_layer,
             GRect(0, l.weather.origin.y, w, l.weather.size.h + l.forecast.size.h));
-
-    backlight_tint_init();
 #else
     forecast_layer_create(window_layer,
             GRect(0, h - FORECAST_HEIGHT, w, FORECAST_HEIGHT));
@@ -77,9 +74,6 @@ static void main_window_load(Window *window) {
 
 static void main_window_unload(Window *window) {
     MEMORY_LOG_HEAP("before_window_unload");
-#ifdef PBL_PLATFORM_EMERY
-    backlight_tint_deinit();
-#endif
     time_layer_destroy();
     weather_status_layer_destroy();
     forecast_layer_destroy();
@@ -108,9 +102,6 @@ static void minute_handler(struct tm *tick_time, TimeUnits units_changed) {
      * приходит погода, и оттуда же слой и обновляется. Ежеминутный опрос стоил
      * четырёх чтений хранилища, то есть почти шести тысяч обращений к флешу за
      * сутки ради ответа, который между ними не меняется. */
-#ifdef PBL_PLATFORM_EMERY
-    backlight_tint_refresh();
-#endif
 }
 
 /*----------------------------

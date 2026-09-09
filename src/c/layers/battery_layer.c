@@ -1,6 +1,5 @@
 #include "battery_layer.h"
 #include "c/appendix/theme.h"
-#include "c/services/backlight_tint.h"
 #include "c/appendix/persist.h"
 #include "c/appendix/memory_log.h"
 #include "c/services/watch_services.h"
@@ -20,8 +19,6 @@ static bool s_battery_subscribed;
 
 static void battery_state_handler(BatteryChargeState charge) {
     battery_layer_refresh();
-    // Same reasoning as the connection handler: one subscription per app.
-    backlight_tint_refresh();
 }
 
 #ifdef PBL_COLOR
