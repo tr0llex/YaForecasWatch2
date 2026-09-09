@@ -322,7 +322,12 @@ WeatherProvider.prototype.withSunEvents = function(lat, lon, callback, onFailure
      * where each sun event contains a 'type' ('sunrise' or 'sunset') and a 'date' (of type Date)
      */
     var dateNow = new Date();
-    var dateTomorrow = new Date().setDate(dateNow.getDate() + 1);
+    /* setDate() returns a timestamp, not a Date. suncalc only ever calls
+     * valueOf() on what it is given, so a bare number happened to work — but
+     * the contract is a Date, and any version that reaches for getTime() or
+     * getUTCHours() would break here without a word. */
+    var dateTomorrow = new Date(dateNow.getTime());
+    dateTomorrow.setDate(dateTomorrow.getDate() + 1);
 
     var resultsToday;
     var resultsTomorrow;
