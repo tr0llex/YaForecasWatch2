@@ -293,11 +293,19 @@ void weather_status_layer_refresh() {
 }
 
 void weather_status_layer_destroy() {
+    /* Same guard the other layers carry: a second destroy must be a no-op,
+     * not a double free of text layers whose pointers were left dangling. */
+    if (!s_weather_status_layer) {
+        return;
+    }
     MEMORY_LOG_HEAP("weather_status_layer_destroy:before");
     text_layer_destroy(s_city_layer);
     text_layer_destroy(s_current_temp_layer);
     text_layer_destroy(s_updated_layer);
     layer_destroy(s_weather_status_layer);
+    s_city_layer = NULL;
+    s_current_temp_layer = NULL;
+    s_updated_layer = NULL;
     s_weather_status_layer = NULL;
     MEMORY_LOG_HEAP("weather_status_layer_destroy:after");
 }
