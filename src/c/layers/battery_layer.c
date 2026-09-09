@@ -41,10 +41,16 @@ static GColor get_battery_color(int level) {
 static void ensure_battery_power_bitmap_loaded(void) {
     if (!s_battery_power_bitmap) {
         s_battery_power_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BATTERY_CHARGING);
-        s_battery_palette[0] = theme_fg();
+        if (!s_battery_power_bitmap) {
+            return;
+        }
         s_battery_palette[1] = GColorClear;
         gbitmap_set_palette(s_battery_power_bitmap, s_battery_palette, false);
     }
+    /* Цвет обновляем всегда, а не только при загрузке. Палитра не копируется
+     * (gbitmap_set_palette с free=false держит наш массив), а значок живёт,
+     * пока идёт зарядка: смена темы посреди неё оставляла его прежним. */
+    s_battery_palette[0] = theme_fg();
 }
 
 static void maybe_unload_battery_power_bitmap(bool show_power_icon) {
@@ -97,7 +103,11 @@ static void battery_update_proc(Layer *layer, GContext *ctx) {
 
     if (show_power_icon) {
         ensure_battery_power_bitmap_loaded();
-        draw_power_icon(ctx, h, s_battery_power_bitmap);
+        /* Ресурс может не загрузиться, а gbitmap_get_bounds(NULL) — это падение.
+         * Без значка зарядки циферблат остаётся читаемым. */
+        if (s_battery_power_bitmap) {
+            draw_power_icon(ctx, h, s_battery_power_bitmap);
+        }
     }
 
     // Draw the white battery outline
@@ -151,7 +161,9 @@ void battery_layer_destroy() {
         gbitmap_destroy(s_battery_power_bitmap);
         s_battery_power_bitmap = NULL;
     }
-    layer_destroy(s_battery_layer);
-    s_battery_layer = NULL;
+    if (s_battery_layer) {
+        layer_destroy(s_battery_layer);
+        s_battery_layer = NULL;
+    }
     MEMORY_LOG_HEAP("battery_layer_destroy:after");
 }
