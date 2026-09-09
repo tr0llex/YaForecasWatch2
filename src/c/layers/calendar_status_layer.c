@@ -90,6 +90,12 @@ static void draw_month_text(GContext *ctx, GRect bounds) {
 }
 
 static void draw_bitmap(GContext *ctx, GBitmap *bitmap, GRect frame) {
+    /* Загрузка ресурса может не удаться, а рисование NULL — это падение, а не
+     * отсутствующий значок. Проверяем здесь: так покрыты все три вызова, и
+     * добавить четвёртый без проверки уже нельзя. */
+    if (!bitmap) {
+        return;
+    }
     graphics_context_set_compositing_mode(ctx, GCompOpSet);
     graphics_draw_bitmap_in_rect(ctx, bitmap, frame);
     graphics_context_set_compositing_mode(ctx, GCompOpAssign);
