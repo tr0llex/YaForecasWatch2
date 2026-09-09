@@ -314,6 +314,7 @@ var config = [
                 "label": "Цвет «ощущается как»",
                 "messageKey": "colorFeelsLike",
                 "defaultValue": "#FFFF00",
+                "sunlight": false,
                 "capabilities": ["COLOR"]
             },
             {
