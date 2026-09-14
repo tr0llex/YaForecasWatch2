@@ -172,6 +172,8 @@ static void city_layer_refresh() {
     text_layer_set_text(s_city_layer, s_city_buffer);
 
     GRect bounds = layer_get_bounds(s_weather_status_layer);
+    /* Мерить во всю ширину: иначе размер режется рамкой прошлого города. */
+    text_layer_move_frame(s_city_layer, GRect(0, 0, bounds.size.w, 100));
     GSize size = text_layer_get_content_size(s_city_layer);
     int y;
     int h;
@@ -188,6 +190,26 @@ static void city_layer_refresh() {
      * название длинное: обрезать имя города не так больно, как двигать
      * температуру с центра. */
     int w = frame_curr_temp.origin.x - MARGIN - ROW_GAP;
+    /* Но уступает не больше, чем нужно. Справа от температуры до времени
+     * обновления обычно остаётся воздух, и «Санкт-Петербург» резался в
+     * «Санкт-Пете…», пока там было пусто. Длинному городу группа уступает
+     * этот воздух: сдвигается вправо ровно настолько, чтобы имя влезло, и не
+     * дальше времени обновления. Короткий город центра не трогает. */
+    if (size.w > w) {
+        const int room_x = frame_updated.origin.x - ROW_GAP - frame_curr_temp.size.w;
+        int group_x = MARGIN + size.w + ROW_GAP;
+        if (group_x > room_x) {
+            group_x = room_x;
+        }
+        const int shift = group_x - frame_curr_temp.origin.x;
+        if (shift > 0) {
+            frame_curr_temp.origin.x += shift;
+            GRect temp_frame = layer_get_frame(text_layer_get_layer(s_current_temp_layer));
+            temp_frame.origin.x += shift;
+            text_layer_move_frame(s_current_temp_layer, temp_frame);
+            w = frame_curr_temp.origin.x - MARGIN - ROW_GAP;
+        }
+    }
     if (w < 0) {
         w = 0;
     }
