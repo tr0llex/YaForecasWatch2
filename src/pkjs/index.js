@@ -172,11 +172,17 @@ Pebble.addEventListener('webviewclosed', function(e) {
 Pebble.addEventListener('ready',
     function (e) {
         var migratedWeekendHolidayColors;
+        var hadStoredClaySettings;
 
         app.devConfig = getDevConfig();
         maybeHandleDevStorageReset(app.devConfig);
+        // Remember this before clayTryDefaults() fills an empty store: a phone whose
+        // PKJS storage came back empty (fresh install, or the phone app lost it across
+        // a restart) must not push freshly written defaults over the settings the
+        // watch still holds in its own persistent storage.
+        hadStoredClaySettings = localStorage.getItem('clay-settings') !== null;
         clayTryDefaults();
-        migratedWeekendHolidayColors = clayTryWeekendHolidayColorMigration();
+        migratedWeekendHolidayColors = clayTryWeekendHolidayColorMigration(hadStoredClaySettings);
         clayTryDevConfig(app.devConfig);
         clayTryFixtureSettings(activeFixture);
         console.log('PebbleKit JS ready!');
@@ -994,9 +1000,10 @@ function getDefaultClaySettings() {
  * Move existing installs from the old all-white weekend/holiday defaults to the
  * current highlighted default while preserving any customized color set.
  *
+ * @param {boolean} hadStoredClaySettings False when the phone had no stored clay settings before this boot.
  * @returns {boolean} True when the migrated settings should be sent to the watch.
  */
-function clayTryWeekendHolidayColorMigration() {
+function clayTryWeekendHolidayColorMigration(hadStoredClaySettings) {
     var persistClayString = localStorage.getItem('clay-settings');
     var persistClay;
 
@@ -1004,6 +1011,15 @@ function clayTryWeekendHolidayColorMigration() {
         persistClayString === null ||
         localStorage.getItem(KEY_V1_34_0_WEEKEND_HOLIDAY_COLOR_MIGRATION) !== null
     ) {
+        return false;
+    }
+
+    if (hadStoredClaySettings === false) {
+        // clayTryDefaults() has just written the current defaults, which already carry
+        // the migrated colors. There is nothing to migrate, and sending these defaults
+        // would overwrite whatever the watch has persisted (see the 'ready' handler).
+        console.log('No stored clay settings on the phone; keeping the settings saved on the watch');
+        markWeekendHolidayColorMigrationComplete();
         return false;
     }
 
