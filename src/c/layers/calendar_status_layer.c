@@ -222,12 +222,40 @@ void calendar_status_layer_create(Layer* parent_layer, GRect frame) {
     MEMORY_HEAP_PROBE_LOG_MIN(&probe);
 }
 
-void bluetooth_icons_refresh(bool connected) {
-    (void)connected;
-    if (!s_calendar_status_layer) {
+bool show_qt_icon(void);
+
+/* Что нарисовано в строке состояния сейчас. Перерисовка стоит разметки и
+ * вывода текста, поэтому просим её только когда картинка действительно
+ * меняется. */
+static bool s_drawn_qt;
+static bool s_drawn_connected;
+static bool s_drawn_valid;
+
+/* Перерисовать, если состояние значков разошлось с нарисованным.
+ *
+ * @param force Перерисовать безусловно — когда поменялось что-то помимо
+ *              значков: дата, тема, палитра битмапов.
+ */
+static void prv_redraw_if_changed(bool force) {
+    /* g_config обнуляется при выгрузке раньше, чем система перестаёт слать
+     * события связи, а show_qt_icon() его разыменовывает. */
+    if (!s_calendar_status_layer || !g_config) {
         return;
     }
+    const bool qt = show_qt_icon();
+    const bool connected = connection_service_peek_pebble_app_connection();
+    if (!force && s_drawn_valid && qt == s_drawn_qt && connected == s_drawn_connected) {
+        return;
+    }
+    s_drawn_qt = qt;
+    s_drawn_connected = connected;
+    s_drawn_valid = true;
     layer_mark_dirty(s_calendar_status_layer);
+}
+
+void bluetooth_icons_refresh(bool connected) {
+    (void)connected;
+    prv_redraw_if_changed(false);
 }
 
 void bluetooth_callback(bool connected) {
@@ -243,13 +271,13 @@ bool show_qt_icon() {
 }
 
 void status_icons_refresh() {
-    if (!s_calendar_status_layer) {
-        return;
-    }
-    layer_mark_dirty(s_calendar_status_layer);
-
-    // Ensure bt icons are correct at start
-    bluetooth_icons_refresh(connection_service_peek_pebble_app_connection());
+    /* Зовётся каждую минуту: у «не беспокоить» нет службы событий, его можно
+     * только опрашивать. Но опрос дёшев, а перерисовка — нет, и меняется этот
+     * значок пару раз в сутки по расписанию. Раньше слой помечался грязным
+     * безусловно, то есть строка состояния перерисовывалась 1440 раз в сутки
+     * ради ответа, который между перерисовками почти никогда не меняется.
+     * Связь и заряд приходят событиями и идут тем же путём. */
+    prv_redraw_if_changed(false);
 }
 
 void calendar_status_layer_refresh() {
@@ -268,7 +296,9 @@ void calendar_status_layer_refresh() {
     snprintf(s_calendar_month_text, sizeof(s_calendar_month_text), "%s, %d %s",
              i18n_weekday_short(tm_now.tm_wday), tm_now.tm_mday,
              i18n_month_genitive(tm_now.tm_mon));
-    status_icons_refresh();
+    /* Поменялась дата и сброшен кеш битмапов — это мимо значков, поэтому
+     * перерисовка нужна независимо от них. */
+    prv_redraw_if_changed(true);
 }
 
 void calendar_status_layer_destroy() {
