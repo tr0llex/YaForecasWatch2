@@ -68,34 +68,6 @@ void persist_init() {
         uint32_t data[] = {0, 0};
         persist_write_data(SUN_EVENT_TIMES, (void*) data, 2*sizeof(uint32_t));
     }
-    if (!persist_exists(CONFIG)) {
-        Config config = (Config) {
-            .celsius = false,
-            .time_lead_zero = false,
-            .axis_12h = false,
-            .start_mon = false,
-            .prev_week = true,
-            .time_font = TIME_FONT_ROBOTO,
-            .color_today = GColorBlack,
-            .show_qt = true,
-            .show_bt = true,
-            .show_bt_disconnect = true,
-            .vibe = false,
-            .show_am_pm = false,
-            .color_saturday = GColorFolly,
-            .color_sunday = GColorFolly,
-            .color_us_federal = GColorFolly,
-            .color_time = GColorWhite,
-            .day_night_shading = true,
-            .holiday_set_1 = HOLIDAY_SET_US,
-            .holiday_set_2 = HOLIDAY_SET_NONE,
-            .color_holiday_1 = GColorFolly,
-            .color_holiday_2 = GColorVividCerulean,
-            .show_feels_like = false,
-            .color_feels_like = GColorYellow
-        };
-        persist_set_config(config);
-    }
     if (!persist_exists(DEBUG_FETCH_ERROR)) {
         persist_write_bool(DEBUG_FETCH_ERROR, false);
     }

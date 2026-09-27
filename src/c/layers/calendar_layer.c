@@ -100,19 +100,55 @@ static int day_of_year(struct tm *t) {
     return day;
 }
 
+// Holiday years read during one redraw: two slots over at most two years.
+#define HOLIDAY_CACHE_SLOTS 4
+
+typedef struct {
+    uint8_t slot;
+    int16_t year;
+    bool valid;
+    HolidayYear data;
+} HolidayCacheEntry;
+
+static HolidayCacheEntry s_holiday_cache[HOLIDAY_CACHE_SLOTS];
+static int s_holiday_cache_used;
+
+static void holiday_cache_reset(void) {
+    s_holiday_cache_used = 0;
+}
+
+static const HolidayYear *holiday_cache_get(uint8_t slot, int16_t year) {
+    for (int i = 0; i < s_holiday_cache_used; ++i) {
+        if (s_holiday_cache[i].slot == slot && s_holiday_cache[i].year == year) {
+            return s_holiday_cache[i].valid ? &s_holiday_cache[i].data : NULL;
+        }
+    }
+
+    if (s_holiday_cache_used >= HOLIDAY_CACHE_SLOTS) {
+        return NULL;
+    }
+
+    HolidayCacheEntry *entry = &s_holiday_cache[s_holiday_cache_used++];
+    entry->slot = slot;
+    entry->year = year;
+    entry->valid = persist_get_holiday_year(slot, year, &entry->data);
+    return entry->valid ? &entry->data : NULL;
+}
+
 static bool holiday_year_has_day(uint8_t slot, uint8_t holiday_set, struct tm *t) {
-    HolidayYear holiday_year;
+    const HolidayYear *holiday_year;
     int bit_index;
 
     if (holiday_set == HOLIDAY_SET_NONE) {
         return false;
     }
 
-    if (!persist_get_holiday_year(slot, (int16_t)(t->tm_year + 1900), &holiday_year)) {
+    holiday_year = holiday_cache_get(slot, (int16_t)(t->tm_year + 1900));
+    if (!holiday_year) {
         return false;
     }
 
-    if (holiday_year.holiday_set != holiday_set) {
+    if (holiday_year->holiday_set != holiday_set) {
         return false;
     }
 
@@ -121,7 +157,7 @@ static bool holiday_year_has_day(uint8_t slot, uint8_t holiday_set, struct tm *t
         return false;
     }
 
-    return (holiday_year.bits[bit_index / 8] & (1 << (bit_index % 8))) != 0;
+    return (holiday_year->bits[bit_index / 8] & (1 << (bit_index % 8))) != 0;
 }
 
 static HolidayMatch holiday_match(struct tm *t) {
@@ -202,6 +238,8 @@ static GColor today_color() {
 }
 
 static void calendar_update_proc(Layer *layer, GContext *ctx) {
+    holiday_cache_reset();
+
     GRect bounds = layer_get_bounds(layer);
     int w = bounds.size.w;
     int h = bounds.size.h;
