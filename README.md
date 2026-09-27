@@ -82,16 +82,17 @@ YaForecasWatch2 can highlight up to two holiday sets at once:
 
 - US holidays
 - Russian holidays
+- Russian production calendar (non-working days including transferred days off)
 - Spanish national holidays
 - Spanish national holidays + Catalonia holidays
 
-Holiday data comes from [Nager.Date](https://date.nager.at/). The phone app caches each selected holiday calendar for 30 days in local storage, sends the current/previous/next year to the watch as compact bitsets, and keeps using stale cached data if a refresh fails. This keeps the calendar usable even when the phone is offline.
+Holiday data comes from [Nager.Date](https://date.nager.at/). The Russian production calendar is built in for the years listed in `src/pkjs/ru-production-calendar.js` (2026, and 2027 marked preliminary); other years use the Nager.Date public holidays without day-off transfers. The phone app caches each selected holiday calendar for 30 days in local storage, sends the current/previous/next year to the watch as compact bitsets, and keeps using stale cached data if a refresh fails. This keeps the calendar usable even when the phone is offline.
 
 When both selected holiday sets match the same date, color watches show a split-color highlight. Black-and-white watches use bold holiday dates.
 
 ## Language
 
-The Language setting (Auto, English, Russian) applies to the face, the settings page and place names; Auto follows the watch language. Existing installs keep English until the setting is changed; a fresh install starts on Auto, and when that resolves to Russian it also defaults to Celsius, Monday and Russian holidays. Cyrillic text is drawn with a bundled Roboto subset (`resources/fonts/Roboto-Regular-subset.ttf`, [SIL OFL](resources/fonts/OFL.txt)); other text keeps the system fonts. aplite stays English.
+The Language setting (Auto, English, Russian) applies to the face, the settings page and place names; Auto follows the watch language. Existing installs keep English until the setting is changed; a fresh install starts on Auto, and when that resolves to Russian it also defaults to Celsius, Monday and the Russian production calendar. Cyrillic text is drawn with a bundled Roboto subset (`resources/fonts/Roboto-Regular-subset.ttf`, [SIL OFL](resources/fonts/OFL.txt)); other text keeps the system fonts. aplite stays English.
 
 ## Platforms
 
