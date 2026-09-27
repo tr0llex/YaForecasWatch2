@@ -20,6 +20,8 @@ static void read_face_options(DictionaryIterator *iterator, Config *config) {
     tuple = dict_find(iterator, MESSAGE_KEY_CLAY_FACE_THEME);
     config->face_theme = tuple && tuple->value->int32 == FACE_THEME_LIGHT
         ? FACE_THEME_LIGHT : FACE_THEME_DARK;
+    tuple = dict_find(iterator, MESSAGE_KEY_CLAY_CALENDAR_WEEKS);
+    config->calendar_weeks = tuple && tuple->value->int32 == 2 ? 2 : 3;
 }
 #endif
 

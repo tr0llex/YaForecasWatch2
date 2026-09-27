@@ -41,7 +41,8 @@ static Config config_defaults(void) {
         .color_holiday_1 = GColorFolly,
         .color_holiday_2 = GColorVividCerulean,
 #ifndef PBL_PLATFORM_APLITE
-        .face_theme = FACE_THEME_DARK
+        .face_theme = FACE_THEME_DARK,
+        .calendar_weeks = 3
 #endif
     };
 }
@@ -109,6 +110,12 @@ int config_n_today() {
         wday += 7;
     return wday;
 }
+
+#ifndef PBL_PLATFORM_APLITE
+int config_calendar_weeks() {
+    return g_config->calendar_weeks == 2 ? 2 : 3;
+}
+#endif
 
 GFont config_time_font() {
     const char *font_keys[] = {

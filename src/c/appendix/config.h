@@ -48,6 +48,7 @@ typedef struct {
     // Append only: older stored configs keep defaults for newer fields.
 #ifndef PBL_PLATFORM_APLITE
     uint8_t face_theme;
+    uint8_t calendar_weeks;
 #endif
 } Config;
 
@@ -66,6 +67,13 @@ int config_format_time(char *s, size_t maxsize, const struct tm * tm_p);
 int config_axis_hour(int hour);
 
 int config_n_today();
+
+#ifdef PBL_PLATFORM_APLITE
+// aplite: always three weeks, to keep its heap headroom.
+#define config_calendar_weeks() 3
+#else
+int config_calendar_weeks();
+#endif
 
 GFont config_time_font();
 

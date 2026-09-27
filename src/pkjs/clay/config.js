@@ -127,6 +127,23 @@ var config = [
             },
             {
                 "type": "select",
+                "label": "Weeks to display",
+                "messageKey": "calendarWeeks",
+                "defaultValue": "3",
+                "capabilities": ["NOT_PLATFORM_APLITE"],
+                "options": [
+                    {
+                        "label": "2",
+                        "value": "2"
+                    },
+                    {
+                        "label": "3",
+                        "value": "3"
+                    }
+                ]
+            },
+            {
+                "type": "select",
                 "label": "First week to display",
                 "messageKey": "firstWeek",
                 "defaultValue": "prev",
