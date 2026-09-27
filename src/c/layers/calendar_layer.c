@@ -39,7 +39,7 @@ static GRect calendar_cell_rect(GRect bounds, int i) {
 // Apply a tiny Emery-only horizontal tweak for two-digit dates that start with "1"
 // to ensure they stay visually centered within calendar boxes.
 static int emery_calendar_text_shift_x(const char *text) {
-    if (text[1] != '\0' && text[0] == '1') {
+    if (text[0] == '1' && text[1] != '\0') {
         return EMERY_CALENDAR_TEXT_SHIFT_X;
     }
 
