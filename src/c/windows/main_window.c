@@ -110,7 +110,6 @@ static void minute_handler(struct tm *tick_time, TimeUnits units_changed) {
         calendar_status_layer_refresh();
     }
     status_icons_refresh();
-    loading_layer_refresh();
 }
 
 /*----------------------------
