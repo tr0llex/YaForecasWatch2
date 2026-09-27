@@ -25,6 +25,24 @@ static void read_face_options(DictionaryIterator *iterator, Config *config) {
     tuple = dict_find(iterator, MESSAGE_KEY_CLAY_LOCALE);
     config->locale = tuple && tuple->value->int32 >= 0 && tuple->value->int32 <= LOCALE_RU
         ? (uint8_t)tuple->value->int32 : LOCALE_AUTO;
+    tuple = dict_find(iterator, MESSAGE_KEY_CLAY_WEATHER_TIME);
+    config->weather_time = tuple && tuple->value->int32 == WEATHER_TIME_UPDATED
+        ? WEATHER_TIME_UPDATED : WEATHER_TIME_SUN_EVENT;
+    tuple = dict_find(iterator, MESSAGE_KEY_CLAY_SHOW_CONDITION);
+    config->show_condition = tuple && tuple->value->int32;
+}
+#endif
+
+// aplite does not show the condition or fetch time (weather_status_layer.c).
+#ifdef PBL_PLATFORM_APLITE
+#define store_weather_extras(iterator)
+#else
+static void store_weather_extras(DictionaryIterator *iterator) {
+    Tuple *tuple;
+    tuple = dict_find(iterator, MESSAGE_KEY_CONDITION);
+    persist_set_condition(tuple ? (int)tuple->value->int32 : 0);
+    tuple = dict_find(iterator, MESSAGE_KEY_WEATHER_FETCHED_AT);
+    persist_set_weather_updated(tuple ? (time_t)tuple->value->int32 : 0);
 }
 #endif
 
@@ -119,6 +137,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         time_t *sun_event_times = (time_t*) (sun_events_tuple->value->data + 1);
         persist_set_sun_event_start_type(sun_event_start_type);
         persist_set_sun_event_times(sun_event_times, 2);
+        store_weather_extras(iterator);
         loading_layer_refresh();
         forecast_layer_refresh();
         weather_status_layer_refresh();

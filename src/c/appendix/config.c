@@ -44,7 +44,9 @@ static Config config_defaults(void) {
 #ifndef PBL_PLATFORM_APLITE
         .face_theme = FACE_THEME_DARK,
         .calendar_weeks = 3,
-        .locale = LOCALE_EN
+        .locale = LOCALE_EN,
+        .weather_time = WEATHER_TIME_SUN_EVENT,
+        .show_condition = false
 #endif
     };
 }

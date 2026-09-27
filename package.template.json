@@ -133,7 +133,11 @@
       "DEBUG_WEATHER_STATE",
       "CLAY_FACE_THEME",
       "CLAY_CALENDAR_WEEKS",
-      "CLAY_LOCALE"
+      "CLAY_LOCALE",
+      "CONDITION",
+      "CLAY_WEATHER_TIME",
+      "WEATHER_FETCHED_AT",
+      "CLAY_SHOW_CONDITION"
     ]
   }
 }
