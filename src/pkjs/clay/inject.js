@@ -1,6 +1,19 @@
 module.exports = function (minified) {
     clayConfig = this;
     var $ = minified.$;
+    var userData = (clayConfig.meta && clayConfig.meta.userData) || {};
+    var strings = userData.strings || {};
+
+    /**
+     * Translated page string, or the English fallback.
+     *
+     * @param {string} key Key in the page strings from clay/i18n.js.
+     * @param {string} fallback English text.
+     * @returns {string} Text to show.
+     */
+    function t(key, fallback) {
+        return Object.prototype.hasOwnProperty.call(strings, key) ? strings[key] : fallback;
+    }
 
     /**
      * Parse stored JSON safely.
@@ -31,7 +44,7 @@ module.exports = function (minified) {
         var entries = parseStoredJson(value);
 
         if (!Array.isArray(entries) || entries.length === 0) {
-            return 'No debug log yet.';
+            return t('noDebugLog', 'No debug log yet.');
         }
 
         return entries.map(function(entry) {
@@ -68,8 +81,8 @@ module.exports = function (minified) {
         button = document.createElement('button');
         button.type = 'button';
         button.className = 'api-key-reveal';
-        button.textContent = 'Show';
-        button.setAttribute('aria-label', 'Show ' + fieldName);
+        button.textContent = t('show', 'Show');
+        button.setAttribute('aria-label', t('show', 'Show') + ' ' + fieldName);
         button.setAttribute('aria-pressed', 'false');
         button.style.position = 'absolute';
         button.style.top = '0';
@@ -90,8 +103,8 @@ module.exports = function (minified) {
             event.preventDefault();
             event.stopPropagation();
             input.type = reveal ? 'text' : 'password';
-            button.textContent = reveal ? 'Hide' : 'Show';
-            button.setAttribute('aria-label', (reveal ? 'Hide ' : 'Show ') + fieldName);
+            button.textContent = reveal ? t('hide', 'Hide') : t('show', 'Show');
+            button.setAttribute('aria-label', (reveal ? t('hide', 'Hide') : t('show', 'Show')) + ' ' + fieldName);
             button.setAttribute('aria-pressed', reveal ? 'true' : 'false');
             input.focus();
         });
@@ -120,8 +133,8 @@ module.exports = function (minified) {
 
         input.type = 'password';
         if (button) {
-            button.textContent = 'Show';
-            button.setAttribute('aria-label', 'Show ' + fieldName);
+            button.textContent = t('show', 'Show');
+            button.setAttribute('aria-label', t('show', 'Show') + ' ' + fieldName);
             button.setAttribute('aria-pressed', 'false');
         }
     }
@@ -156,8 +169,8 @@ module.exports = function (minified) {
         clayYandexApiKey = clayConfig.getItemByMessageKey('yandexApiKey');
         clayProvider = clayConfig.getItemByMessageKey('provider');
         clayLocation = clayConfig.getItemByMessageKey('location');
-        addApiKeyRevealButton(clayOwmApiKey, 'OpenWeatherMap API key');
-        addApiKeyRevealButton(clayYandexApiKey, 'Yandex Weather API key');
+        addApiKeyRevealButton(clayOwmApiKey, t('owmKey', 'OpenWeatherMap API key'));
+        addApiKeyRevealButton(clayYandexApiKey, t('yandexKey', 'Yandex Weather API key'));
         initProvider = clayProvider.get();
         initOwmApiKey = clayOwmApiKey.get();
         initYandexApiKey = clayYandexApiKey.get();
@@ -177,14 +190,14 @@ module.exports = function (minified) {
                 clayOwmApiKey.show();
             }
             else {
-                maskApiKeyInput(clayOwmApiKey, 'OpenWeatherMap API key');
+                maskApiKeyInput(clayOwmApiKey, t('owmKey', 'OpenWeatherMap API key'));
                 clayOwmApiKey.hide();
             }
             if (this.get() === 'yandex') {
                 clayYandexApiKey.show();
             }
             else {
-                maskApiKeyInput(clayYandexApiKey, 'Yandex Weather API key');
+                maskApiKeyInput(clayYandexApiKey, t('yandexKey', 'Yandex Weather API key'));
                 clayYandexApiKey.hide();
             }
             console.log('Provider set to ' + this.get());
@@ -197,7 +210,7 @@ module.exports = function (minified) {
         if (lastFetchSuccess !== null) {
             date = new Date(lastFetchSuccess.time);
             lastFetchSuccessTime = date.getTime();
-            $('#lastFetchSpan').ht(date.toLocaleDateString() + ' ' + date.toLocaleTimeString() + ' with ' + lastFetchSuccess.name);
+            $('#lastFetchSpan').ht(date.toLocaleDateString() + ' ' + date.toLocaleTimeString() + t('via', ' with ') + lastFetchSuccess.name);
         }
 
         lastFetchAttemptString = clayConfig.meta.userData.lastFetchAttempt;
@@ -209,9 +222,11 @@ module.exports = function (minified) {
                 shouldShowLastAttempt = !Boolean(lastFetchSuccessTime) || attemptTime > lastFetchSuccessTime;
 
                 if (shouldShowLastAttempt) {
-                    attemptText = '<br>Last failed attempt:<br>';
-                    attemptText += attemptDate.toLocaleDateString() + ' ' + attemptDate.toLocaleTimeString() + ' with ' + lastFetchAttempt.name;
-                    attemptText += '<br>Error: ' + lastFetchAttempt.error.stage + ': ' + lastFetchAttempt.error.code;
+                    attemptText = '<br>' + t('lastFailedAttempt', 'Last failed attempt:') + '<br>';
+                    attemptText += attemptDate.toLocaleDateString() + ' ' + attemptDate.toLocaleTimeString()
+                        + t('via', ' with ') + lastFetchAttempt.name;
+                    attemptText += '<br>' + t('error', 'Error: ') + lastFetchAttempt.error.stage
+                        + ': ' + lastFetchAttempt.error.code;
                     $('#lastAttemptBlock').ht(attemptText);
                 }
             }

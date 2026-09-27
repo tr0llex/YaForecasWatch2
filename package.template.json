@@ -62,6 +62,27 @@
           "name": "IMAGE_BATTERY_CHARGING",
           "file": "img/battery-charging.png",
           "memoryFormat": "1BitPalette"
+        },
+        {
+          "type": "font",
+          "name": "FONT_TEXT_13",
+          "file": "fonts/Roboto-Regular-subset.ttf",
+          "characterRegex": "[ -~°•ЁА-яё–—«»]",
+          "targetPlatforms": ["basalt", "diorite", "emery", "flint"]
+        },
+        {
+          "type": "font",
+          "name": "FONT_TEXT_15",
+          "file": "fonts/Roboto-Regular-subset.ttf",
+          "characterRegex": "[ -~°•ЁА-яё–—«»]",
+          "targetPlatforms": ["basalt", "diorite", "emery", "flint"]
+        },
+        {
+          "type": "font",
+          "name": "FONT_TEXT_20",
+          "file": "fonts/Roboto-Regular-subset.ttf",
+          "characterRegex": "[ -~°•ЁА-яё–—«»]",
+          "targetPlatforms": ["emery"]
         }
       ]
     },
@@ -111,7 +132,8 @@
       "HOLIDAY_BITS",
       "DEBUG_WEATHER_STATE",
       "CLAY_FACE_THEME",
-      "CLAY_CALENDAR_WEEKS"
+      "CLAY_CALENDAR_WEEKS",
+      "CLAY_LOCALE"
     ]
   }
 }

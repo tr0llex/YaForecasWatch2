@@ -22,6 +22,9 @@ static void read_face_options(DictionaryIterator *iterator, Config *config) {
         ? FACE_THEME_LIGHT : FACE_THEME_DARK;
     tuple = dict_find(iterator, MESSAGE_KEY_CLAY_CALENDAR_WEEKS);
     config->calendar_weeks = tuple && tuple->value->int32 == 2 ? 2 : 3;
+    tuple = dict_find(iterator, MESSAGE_KEY_CLAY_LOCALE);
+    config->locale = tuple && tuple->value->int32 >= 0 && tuple->value->int32 <= LOCALE_RU
+        ? (uint8_t)tuple->value->int32 : LOCALE_AUTO;
 }
 #endif
 

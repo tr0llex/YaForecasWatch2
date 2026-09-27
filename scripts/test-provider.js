@@ -22,7 +22,10 @@ global.XMLHttpRequest = function XMLHttpRequest() {
   this.responseText = '';
 };
 
-global.XMLHttpRequest.prototype.open = function open() {};
+let lastUrl = null;
+global.XMLHttpRequest.prototype.open = function open(method, url) {
+  lastUrl = url;
+};
 global.XMLHttpRequest.prototype.setRequestHeader = function setRequestHeader() {};
 global.XMLHttpRequest.prototype.send = function send() {
   if (requestMode === 'success') {
@@ -93,5 +96,20 @@ assert.strictEqual(provider.diagnostics.reverseGeocode.status, 'unknown');
 assert.deepStrictEqual(provider.warnings.map(function(warning) {
   return warning.code;
 }), ['timeout', 'unknown_fallback']);
+
+requestMode = 'success';
+provider = makeProvider();
+provider.geocodeLanguage = 'RU';
+provider.withCityName(59.93, 30.31, function(cityName, countryCode) {
+  place = { cityName, countryCode };
+});
+assert.ok(/[?&]langCode=RU&/.test(lastUrl), lastUrl);
+requestMode = 'timeout';
+provider = makeProvider();
+provider.withCityName(59.93, 30.31, function(cityName, countryCode) {
+  place = { cityName, countryCode };
+});
+assert.ok(/[?&]langCode=EN&/.test(lastUrl), lastUrl);
+assert.deepStrictEqual(place, { cityName: 'Unknown', countryCode: null });
 
 console.log('Provider tests passed');

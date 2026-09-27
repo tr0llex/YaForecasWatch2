@@ -21,6 +21,9 @@ If you need runtime logs, `mise install-emulator --logs` runs it in an emulator 
 
 - Colors go through `theme_bg()`, `theme_fg()`, `theme_pick()` and `theme_readable()` (`theme.h`); the dark theme keeps the original colors. On aplite the helpers are constants and `THEME_IS_FIXED` is 1, so refresh paths that re-apply colors are skipped there.
 - Band rectangles come from `face_layout_compute()` (`face_layout.h`).
+- Face strings come from `i18n.c`; text that may contain Cyrillic is measured and drawn with `ui_font_for_text()` (`ui_fonts.h`). Settings page translations live in `src/pkjs/clay/i18n.js`, keyed by `messageKey` (`scripts/test-clay-i18n.js` checks coverage). On aplite the i18n layer is compiled out (`I18N_IS_FIXED`).
+- Russian production calendar: each year the government publishes a decree with the non-working days and transfers for the next year (usually in autumn, after a Ministry of Labour draft). Add the year to `CALENDAR` in `src/pkjs/ru-production-calendar.js` from the decree, list it in `PRELIMINARY_YEARS` while only the draft exists and remove it from there once the decree is out, then update the header comment and the years in README.
+- Tests: `node scripts/test-*.js` (after `mise build`, which generates `package.json`).
 - Append new `Config` fields and `messageKeys` at the end, and read new Clay tuples as optional in `app_message.c`. Options aplite leaves out go in the `#ifndef PBL_PLATFORM_APLITE` block of `Config` and are hidden in the settings page with `NOT_PLATFORM_APLITE`. Run `pebble clean` after adding a message key.
 
 ## Code Conventions
