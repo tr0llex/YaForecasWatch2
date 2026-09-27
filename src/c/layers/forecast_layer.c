@@ -1,4 +1,5 @@
 #include "forecast_layer.h"
+#include "c/appendix/theme.h"
 #include "c/appendix/persist.h"
 #include "c/appendix/math.h"
 #include "c/appendix/config.h"
@@ -30,12 +31,12 @@
 #define FORECAST_BOTTOM_PAD 0
 #endif
 #define NIGHT_HATCH_SPACING PBL_IF_COLOR_ELSE(6, 7)
-#define NIGHT_HATCH_COLOR GColorDarkGray
+#define NIGHT_HATCH_COLOR theme_pick(GColorDarkGray, GColorLightGray)
 #define PRECIP_FILL_COLOR PBL_IF_COLOR_ELSE(GColorCobaltBlue, GColorLightGray)
 #define NIGHT_PRECIP_FILL_COLOR PBL_IF_COLOR_ELSE(GColorDukeBlue, GColorLightGray)
-#define NIGHT_HATCH_COLOR_PRECIP PBL_IF_COLOR_ELSE(GColorBlue, GColorWhite)
-#define NIGHT_BOUNDARY_COLOR PBL_IF_COLOR_ELSE(GColorDarkGray, GColorLightGray)
-#define NIGHT_BOUNDARY_COLOR_PRECIP PBL_IF_COLOR_ELSE(GColorVividCerulean, GColorWhite)
+#define NIGHT_HATCH_COLOR_PRECIP PBL_IF_COLOR_ELSE(GColorBlue, theme_fg())
+#define NIGHT_BOUNDARY_COLOR PBL_IF_COLOR_ELSE(theme_pick(GColorDarkGray, GColorLightGray), GColorLightGray)
+#define NIGHT_BOUNDARY_COLOR_PRECIP PBL_IF_COLOR_ELSE(GColorVividCerulean, theme_fg())
 #define FORECAST_STEP_SECONDS (60 * 60)
 #define DAY_SECONDS (24 * 60 * 60)
 #define UV_INDEX_MAX 11
@@ -112,11 +113,11 @@ static RenderSpec make_render_spec()
 {
     RenderSpec spec = {
         .draw_night_overlay = g_config->day_night_shading,
-        .axis_color = PBL_IF_COLOR_ELSE(GColorOrange, GColorWhite)};
+        .axis_color = PBL_IF_COLOR_ELSE(theme_readable(GColorOrange), theme_fg())};
 
     if (spec.draw_night_overlay)
     {
-        spec.axis_color = PBL_IF_COLOR_ELSE(GColorRed, GColorWhite);
+        spec.axis_color = PBL_IF_COLOR_ELSE(theme_readable(GColorRed), theme_fg());
     }
 
     return spec;
@@ -137,7 +138,7 @@ static void draw_uv_axis(GContext *ctx, GRect graph_plot_rect)
 {
     const int16_t axis_x = graph_plot_rect.origin.x + graph_plot_rect.size.w;
     const int16_t axis_bottom = graph_plot_rect.origin.y + graph_plot_rect.size.h;
-    const GColor uv_color = PBL_IF_COLOR_ELSE(GColorYellow, GColorWhite);
+    const GColor uv_color = PBL_IF_COLOR_ELSE(theme_readable(GColorYellow), theme_fg());
 
     graphics_context_set_stroke_color(ctx, uv_color);
     graphics_context_set_text_color(ctx, uv_color);
@@ -329,7 +330,7 @@ static void draw_night_regions(GContext *ctx, GRect graph_plot_rect, time_t grap
 
     const int16_t hatch_spacing = NIGHT_HATCH_SPACING;
     const bool is_color = PBL_IF_COLOR_ELSE(true, false);
-    graphics_context_set_stroke_color(ctx, is_color ? NIGHT_HATCH_COLOR : GColorWhite);
+    graphics_context_set_stroke_color(ctx, is_color ? NIGHT_HATCH_COLOR : theme_fg());
 
     for (int i = 0; i < night_segments->count; ++i)
     {
@@ -444,7 +445,7 @@ static void draw_night_hatch_over_precip(GContext *ctx, GRect graph_plot_rect, t
             }
         }
 
-        graphics_context_set_stroke_color(ctx, is_color ? NIGHT_HATCH_COLOR_PRECIP : GColorWhite);
+        graphics_context_set_stroke_color(ctx, is_color ? NIGHT_HATCH_COLOR_PRECIP : theme_fg());
         for (int16_t x = x0; x < x1; ++x)
         {
             const int16_t precip_y = clamped_precip_top_y_for_x(graph_plot_rect, points_precip, num_entries, x);
@@ -542,7 +543,7 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
     MemoryHeapProbe redraw_probe = MEMORY_HEAP_PROBE_START("forecast_update");
     if (stored_num_entries < 2)
     {
-        graphics_context_set_fill_color(ctx, GColorBlack);
+        graphics_context_set_fill_color(ctx, theme_bg());
         graphics_fill_rect(ctx, bounds, 0, GCornerNone);
         MEMORY_LOG_HEAP("forecast_update:exit");
         return;
@@ -606,8 +607,8 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
         draw_night_boundaries(ctx, graph_plot_rect, forecast_start, forecast_end, &night_segments);
     }
 
-    graphics_context_set_text_color(ctx, GColorWhite);
-    graphics_context_set_stroke_color(ctx, GColorLightGray);
+    graphics_context_set_text_color(ctx, theme_fg());
+    graphics_context_set_stroke_color(ctx, theme_pick(GColorLightGray, GColorDarkGray));
 
     // Round this division up by adding (divisor - 1) to the dividend.
     const int entries_per_label = ((HOUR_LABEL_MIN_SPACING - 1) * span + graph_w) / graph_w;
@@ -659,7 +660,8 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
         // emery: draw emphasized major/minor bottom-axis ticks for improved readability.
 #ifdef PBL_PLATFORM_EMERY
         const bool is_label_tick = (i % entries_per_label) == 0;
-        const GColor tick_color = is_label_tick ? GColorLightGray : GColorDarkGray;
+        const GColor tick_color = is_label_tick ? theme_pick(GColorLightGray, GColorDarkGray)
+                                                : theme_pick(GColorDarkGray, GColorLightGray);
         graphics_context_set_stroke_width(ctx, 1);
         graphics_context_set_stroke_color(ctx, tick_color);
         graphics_draw_line(ctx,
@@ -738,7 +740,7 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
     s_path_precip_top.num_points = num_entries;
     s_path_precip_top.points = s_points_precip;
     MEMORY_HEAP_PROBE_SAMPLE("before_precip_top_draw", &redraw_probe);
-    graphics_context_set_stroke_color(ctx, GColorPictonBlue);
+    graphics_context_set_stroke_color(ctx, theme_readable(GColorPictonBlue));
     graphics_context_set_stroke_width(ctx, 1);
     gpath_draw_outline_open(ctx, &s_path_precip_top);
     MEMORY_HEAP_PROBE_SAMPLE("after_precip_top_draw", &redraw_probe);
@@ -747,7 +749,7 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
     {
         s_path_uv.num_points = num_entries;
         s_path_uv.points = s_points_uv;
-        graphics_context_set_stroke_color(ctx, PBL_IF_COLOR_ELSE(GColorYellow, GColorWhite));
+        graphics_context_set_stroke_color(ctx, PBL_IF_COLOR_ELSE(theme_readable(GColorYellow), theme_fg()));
         graphics_context_set_stroke_width(ctx, 1);
         gpath_draw_outline_open(ctx, &s_path_uv);
     }
@@ -756,14 +758,14 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
     s_path_temp.num_points = num_entries;
     s_path_temp.points = s_points_temp;
     MEMORY_HEAP_PROBE_SAMPLE("before_temp_path_draw", &redraw_probe);
-    graphics_context_set_stroke_color(ctx, PBL_IF_COLOR_ELSE(GColorRed, GColorWhite));
+    graphics_context_set_stroke_color(ctx, PBL_IF_COLOR_ELSE(theme_readable(GColorRed), theme_fg()));
     graphics_context_set_stroke_width(ctx, 3); // Only odd stroke width values supported
     gpath_draw_outline_open(ctx, &s_path_temp);
     MEMORY_HEAP_PROBE_SAMPLE("after_temp_path_draw", &redraw_probe);
 
     if (has_feels_like_data)
     {
-        graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(g_config->color_feels_like, GColorWhite));
+        graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(theme_readable(g_config->color_feels_like), theme_fg()));
         for (int i = 0; i < num_entries; ++i)
         {
             if (is_feels_like_available(feels_like_temps[i + data_offset]))
@@ -779,14 +781,14 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
     const int16_t axis_y = h - BOTTOM_AXIS_H;
     graphics_draw_line(ctx, GPoint(graph_bounds.origin.x, axis_y), GPoint(graph_bounds.origin.x + w, axis_y));
     // And for the left side axis
-    graphics_context_set_fill_color(ctx, GColorBlack);
+    graphics_context_set_fill_color(ctx, theme_bg());
     graphics_fill_rect(ctx, GRect(0, 0, s_axis_left_w, h - BOTTOM_AXIS_H), 0, GCornerNone); // Paint over plot bleeding
     graphics_draw_line(ctx, GPoint(graph_bounds.origin.x, 0), GPoint(graph_bounds.origin.x, axis_y));
     if (has_uv_data)
     {
         draw_uv_axis(ctx, graph_plot_rect);
     }
-    graphics_context_set_text_color(ctx, GColorWhite);
+    graphics_context_set_text_color(ctx, theme_fg());
     GSize hi_size = temp_label_string_size(s_buffer_hi);
     GSize lo_size = temp_label_string_size(s_buffer_lo);
     // emery: anchor hi/lo labels to the top/bottom of the axis strip to avoid clipping.

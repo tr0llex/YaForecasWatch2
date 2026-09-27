@@ -54,6 +54,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     Tuple *clay_day_night_shading_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_DAY_NIGHT_SHADING);
     Tuple *clay_show_feels_like_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_SHOW_FEELS_LIKE);
     Tuple *clay_color_feels_like_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_COLOR_FEELS_LIKE);
+    Tuple *clay_face_theme_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_FACE_THEME);
 
     if(temp_trend_tuple && precip_trend_tuple && uv_trend_tuple && forecast_start_tuple && num_entries_tuple
         && current_temp_tuple && city_tuple && sun_events_tuple) {
@@ -164,6 +165,12 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         GColor color_holiday_2 = GColorFromHEX(clay_color_holiday_2_tuple->value->int32);
         GColor color_time = GColorFromHEX(clay_color_time_tuple->value->int32);
         GColor color_feels_like = GColorFromHEX(clay_color_feels_like_tuple->value->int32);
+        uint8_t face_theme = clay_face_theme_tuple
+            ? (uint8_t)clay_face_theme_tuple->value->int32
+            : FACE_THEME_DARK;
+        if (face_theme > FACE_THEME_LIGHT) {
+            face_theme = FACE_THEME_DARK;
+        }
         Config config = (Config) {
             .celsius = clay_celsius,
             .time_lead_zero = time_lead_zero,
@@ -187,7 +194,8 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
             .holiday_set_1 = holiday_set_1,
             .holiday_set_2 = holiday_set_2,
             .color_holiday_1 = color_holiday_1,
-            .color_holiday_2 = color_holiday_2
+            .color_holiday_2 = color_holiday_2,
+            .face_theme = face_theme
         };
         persist_set_config(config);
         main_window_refresh();

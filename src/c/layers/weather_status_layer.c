@@ -1,5 +1,6 @@
 #include "weather_status_layer.h"
 #include <string.h>
+#include "c/appendix/theme.h"
 #include "c/appendix/persist.h"
 #include "c/appendix/config.h"
 #include "c/appendix/memory_log.h"
@@ -167,21 +168,21 @@ static void weather_status_layer_init(GRect bounds) {
     s_current_temp_layer = text_layer_create(GRect(MARGIN, -FONT_18_OFFSET, 40, 25));
     text_layer_set_background_color(s_current_temp_layer, GColorClear);
     text_layer_set_text_alignment(s_current_temp_layer, GTextAlignmentLeft);
-    text_layer_set_text_color(s_current_temp_layer, GColorWhite);
+    text_layer_set_text_color(s_current_temp_layer, theme_fg());
     text_layer_set_font(s_current_temp_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
 
     // City where weather was fetched
     s_city_layer = text_layer_create(GRect(w/2 - CITY_INIT_WIDTH/2, -FONT_14_OFFSET, CITY_INIT_WIDTH, 25));
     text_layer_set_background_color(s_city_layer, GColorClear);
     text_layer_set_text_alignment(s_city_layer, GTextAlignmentCenter);
-    text_layer_set_text_color(s_city_layer, GColorWhite);
+    text_layer_set_text_color(s_city_layer, theme_fg());
     text_layer_set_font(s_city_layer, fonts_get_system_font(CITY_FONT_KEY));
 
     // Time of next sun event (sunrise/sunset)
     s_next_sun_event_layer = text_layer_create(GRect(w - MARGIN - 6 - 40, 4 - FONT_18_OFFSET, 40, 25));
     text_layer_set_background_color(s_next_sun_event_layer, GColorClear);
     text_layer_set_text_alignment(s_next_sun_event_layer, GTextAlignmentLeft);
-    text_layer_set_text_color(s_next_sun_event_layer, GColorWhite);
+    text_layer_set_text_color(s_next_sun_event_layer, theme_fg());
     text_layer_set_font(s_next_sun_event_layer, fonts_get_system_font(SUN_EVENT_FONT_KEY));
 
     current_temp_layer_refresh();
@@ -209,9 +210,9 @@ static void weather_status_update_proc(Layer *layer, GContext *ctx) {
 #else
     gpath_move_to(s_arrow_path, GPoint(w - 4, 6));
 #endif
-    graphics_context_set_stroke_color(ctx, GColorWhite);
+    graphics_context_set_stroke_color(ctx, theme_fg());
     gpath_draw_outline_open(ctx, s_arrow_path);
-    graphics_context_set_fill_color(ctx, GColorWhite);
+    graphics_context_set_fill_color(ctx, theme_fg());
     gpath_draw_filled(ctx, s_arrow_path);
     MEMORY_LOG_HEAP("weather_status_update:exit");
 }
@@ -246,6 +247,9 @@ void weather_status_layer_refresh() {
         return;
     }
     layer_mark_dirty(s_weather_status_layer);
+    text_layer_set_text_color(s_current_temp_layer, theme_fg());
+    text_layer_set_text_color(s_city_layer, theme_fg());
+    text_layer_set_text_color(s_next_sun_event_layer, theme_fg());
     current_temp_layer_refresh();
     sun_event_layer_refresh();
     city_layer_refresh();

@@ -16,6 +16,31 @@ var config = [
         "items": [
             {
                 "type": "heading",
+                "defaultValue": "Face",
+            },
+            {
+                "type": "select",
+                "label": "Theme",
+                "messageKey": "faceTheme",
+                "defaultValue": "dark",
+                "options": [
+                    {
+                        "label": "Dark",
+                        "value": "dark"
+                    },
+                    {
+                        "label": "Light",
+                        "value": "light"
+                    }
+                ]
+            },
+        ]
+    },
+    {
+        "type": "section",
+        "items": [
+            {
+                "type": "heading",
                 "defaultValue": "Time",
             },
             {

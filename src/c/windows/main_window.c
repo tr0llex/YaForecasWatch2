@@ -6,6 +6,7 @@
 #include "c/layers/calendar_layer.h"
 #include "c/layers/calendar_status_layer.h"
 #include "c/layers/loading_layer.h"
+#include "c/appendix/theme.h"
 #include "c/appendix/app_message.h"
 #include "c/appendix/persist.h"
 #include "c/appendix/memory_log.h"
@@ -16,7 +17,7 @@ static void main_window_load(Window *window) {
     // Get information about the Window
     Layer *window_layer = window_get_root_layer(window);
     GRect bounds = layer_get_bounds(window_layer);
-    window_set_background_color(window, GColorBlack);
+    window_set_background_color(window, theme_bg());
 
     const FaceLayout layout = face_layout_compute(
             bounds, calendar_status_layer_height(), weather_status_layer_height());
@@ -82,11 +83,13 @@ void main_window_refresh() {
     if (!s_main_window) {
         return;
     }
+    window_set_background_color(s_main_window, theme_bg());
     time_layer_refresh();
     weather_status_layer_refresh();
     forecast_layer_refresh();
     calendar_layer_refresh();
     calendar_status_layer_refresh();
+    loading_layer_refresh();
 }
 
 void main_window_destroy() {

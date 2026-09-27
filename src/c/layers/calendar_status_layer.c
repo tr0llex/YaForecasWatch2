@@ -1,5 +1,6 @@
 #include "calendar_status_layer.h"
 #include "battery_layer.h"
+#include "c/appendix/theme.h"
 #include "c/appendix/config.h"
 #include "c/appendix/memory_log.h"
 #include "c/services/watch_services.h"
@@ -48,7 +49,7 @@ static GRect month_text_rect(GRect bounds, GFont font) {
 
 static void draw_month_text(GContext *ctx, GRect bounds) {
     const GFont month_font = fonts_get_system_font(MONTH_FONT_KEY);
-    graphics_context_set_text_color(ctx, GColorWhite);
+    graphics_context_set_text_color(ctx, theme_fg());
     graphics_draw_text(
         ctx,
         s_calendar_month_text,
@@ -74,10 +75,11 @@ static void ensure_mute_bitmap_loaded(void) {
         if (!s_mute_bitmap) {
             return;
         }
-        s_mute_palette[0] = GColorWhite;
         s_mute_palette[1] = GColorClear;
         gbitmap_set_palette(s_mute_bitmap, s_mute_palette, false);
     }
+    // Set on every draw so a theme change reaches a loaded bitmap.
+    s_mute_palette[0] = theme_fg();
 }
 
 static void ensure_bt_bitmap_loaded(void) {
@@ -86,10 +88,10 @@ static void ensure_bt_bitmap_loaded(void) {
         if (!s_bt_bitmap) {
             return;
         }
-        s_bt_palette[0] = PBL_IF_COLOR_ELSE(GColorPictonBlue, GColorWhite);
         s_bt_palette[1] = GColorClear;
         gbitmap_set_palette(s_bt_bitmap, s_bt_palette, false);
     }
+    s_bt_palette[0] = PBL_IF_COLOR_ELSE(theme_readable(GColorPictonBlue), theme_fg());
 }
 
 static void ensure_bt_disconnect_bitmap_loaded(void) {
@@ -98,10 +100,10 @@ static void ensure_bt_disconnect_bitmap_loaded(void) {
         if (!s_bt_disconnect_bitmap) {
             return;
         }
-        s_bt_disconnect_palette[0] = PBL_IF_COLOR_ELSE(GColorRed, GColorWhite);
         s_bt_disconnect_palette[1] = GColorClear;
         gbitmap_set_palette(s_bt_disconnect_bitmap, s_bt_disconnect_palette, false);
     }
+    s_bt_disconnect_palette[0] = PBL_IF_COLOR_ELSE(theme_readable(GColorRed), theme_fg());
 }
 
 static void maybe_unload_calendar_status_bitmaps(bool show_qt, bool connected) {
