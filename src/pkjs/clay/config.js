@@ -36,6 +36,28 @@ var config = [
                     }
                 ]
             },
+            {
+                "type": "select",
+                "label": "Language",
+                "messageKey": "locale",
+                "defaultValue": "en",
+                "capabilities": ["NOT_PLATFORM_APLITE"],
+                "description": "Auto follows the language of your watch.",
+                "options": [
+                    {
+                        "label": "Auto",
+                        "value": "auto"
+                    },
+                    {
+                        "label": "English",
+                        "value": "en"
+                    },
+                    {
+                        "label": "Русский",
+                        "value": "ru"
+                    }
+                ]
+            },
         ]
     },
     {

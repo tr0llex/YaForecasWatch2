@@ -1,5 +1,7 @@
 #include "weather_status_layer.h"
 #include <string.h>
+#include "c/appendix/ui_fonts.h"
+#include "c/appendix/i18n.h"
 #include "c/appendix/theme.h"
 #include "c/appendix/persist.h"
 #include "c/appendix/config.h"
@@ -14,6 +16,7 @@
 // emery: use larger text and arrow geometry
 #ifdef PBL_PLATFORM_EMERY
 #define CITY_FONT_KEY FONT_KEY_GOTHIC_18
+#define CITY_TEXT_SIZE UI_TEXT_MEDIUM
 #define SUN_EVENT_FONT_KEY FONT_KEY_GOTHIC_18
 #define ARROW_H 10
 #define ARROW_HEAD_H 4
@@ -21,6 +24,7 @@
 #define ARROW_W 8
 #else
 #define CITY_FONT_KEY FONT_KEY_GOTHIC_14
+#define CITY_TEXT_SIZE UI_TEXT_SMALL
 #define SUN_EVENT_FONT_KEY FONT_KEY_GOTHIC_14
 #define ARROW_H 8
 #define ARROW_HEAD_H 3
@@ -90,6 +94,15 @@ static void city_layer_refresh() {
     persist_get_city(s_city_buffer, sizeof(s_city_buffer));
     s_city_buffer[sizeof(s_city_buffer) - 1] = '\0';
     trim_partial_utf8(s_city_buffer);
+    int font_offset_y = 0;
+    if (!I18N_IS_FIXED) {
+        const GFont system_font = fonts_get_system_font(CITY_FONT_KEY);
+        const GFont city_font = ui_font_for_text(s_city_buffer, system_font, CITY_TEXT_SIZE);
+        text_layer_set_font(s_city_layer, city_font);
+        if (city_font != system_font) {
+            font_offset_y = ui_font_text_offset_y(CITY_TEXT_SIZE);
+        }
+    }
     text_layer_set_text(s_city_layer, s_city_buffer);
 
     // Dynamic resizing
@@ -106,6 +119,7 @@ static void city_layer_refresh() {
     y = -FONT_14_OFFSET;
     h = size.h + FONT_14_OFFSET;
 #endif
+    y += font_offset_y;
     int w = bounds.size.w - frame_curr_temp.size.w - frame_sun_event.size.w - MARGIN * 4;
     text_layer_move_frame(s_city_layer, GRect(x, y, w, h));
 }

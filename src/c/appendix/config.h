@@ -13,6 +13,12 @@ enum FaceTheme {
     FACE_THEME_LIGHT = 1,
 };
 
+enum Locale {
+    LOCALE_AUTO = 0,
+    LOCALE_EN = 1,
+    LOCALE_RU = 2,
+};
+
 enum HolidaySet {
     HOLIDAY_SET_NONE = 0,
     HOLIDAY_SET_US = 1,
@@ -49,6 +55,7 @@ typedef struct {
 #ifndef PBL_PLATFORM_APLITE
     uint8_t face_theme;
     uint8_t calendar_weeks;
+    uint8_t locale;
 #endif
 } Config;
 

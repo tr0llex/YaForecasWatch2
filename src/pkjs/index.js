@@ -8,6 +8,7 @@ var createTelemetryClient = require('./telemetry.js');
 var Clay = require('./clay/_source.js');
 var clayConfig = require('./clay/config.js');
 var customClay = require('./clay/inject.js');
+var clayI18n = require('./clay/i18n.js');
 var storageKeys = require('./storage-keys.js');
 var pkg = require('../../package.json');
 var activeFixture = require('./active-fixture.generated.js');
@@ -140,6 +141,10 @@ Pebble.addEventListener('appmessage', function(e) {
 });
 
 Pebble.addEventListener('showConfiguration', function(e) {
+    var language = getSettingsLanguage();
+
+    clay.config = clayI18n.localizeConfig(clayConfig, language);
+    clay.meta.userData.strings = clayI18n.pageStrings(language);
     // Set the userData here rather than in the Clay() constructor so it's actually up to date
     clay.meta.userData.lastFetchSuccess = localStorage.getItem(KEY_LAST_FETCH_SUCCESS);
     clay.meta.userData.lastFetchAttempt = localStorage.getItem(KEY_LAST_FETCH_ATTEMPT);
@@ -228,6 +233,34 @@ Pebble.addEventListener('ready',
         startTick();
     }
 );
+
+/**
+ * Language for phone-side text: the settings page and place names.
+ *
+ * @returns {string} Supported language code, e.g. 'en' or 'ru'.
+ */
+function getSettingsLanguage() {
+    var watchInfo = null;
+    var settings = app.settings || getClaySettings();
+
+    try {
+        watchInfo = Pebble.getActiveWatchInfo();
+    }
+    catch (ex) {
+        watchInfo = null;
+    }
+
+    // aplite has no room for the Cyrillic font, so its face stays English.
+    if (watchInfo && watchInfo.platform === 'aplite') {
+        return 'en';
+    }
+
+    return clayI18n.resolveLanguage(
+        settings && settings.locale,
+        watchInfo,
+        typeof navigator !== 'undefined' ? navigator.language : null
+    );
+}
 
 /**
  * Build telemetry runtime config from package.json.
@@ -840,6 +873,9 @@ function sendClaySettings(onSuccess, onFailure) {
         "CLAY_PREV_WEEK": app.settings.firstWeek === 'prev',
         "CLAY_FACE_THEME": app.settings.faceTheme === 'light' ? 1 : 0,
         "CLAY_CALENDAR_WEEKS": String(app.settings.calendarWeeks) === '2' ? 2 : 3,
+        "CLAY_LOCALE": ['auto', 'en', 'ru'].indexOf(app.settings.locale) > 0
+            ? ['auto', 'en', 'ru'].indexOf(app.settings.locale)
+            : 0,
         "CLAY_TIME_FONT": ['roboto', 'leco', 'bitham'].indexOf(app.settings.timeFont),
         "CLAY_SHOW_QT": app.settings.showQt,
         "CLAY_SHOW_BT": app.settings.btIcons === "connected" || app.settings.btIcons === "both",
@@ -897,6 +933,7 @@ function refreshProvider() {
     var oldLocation = app.provider ? app.provider.location : null;
     setProvider(app.settings.provider);
     app.provider.location = app.settings.location === '' ? null : app.settings.location;
+    app.provider.geocodeLanguage = getSettingsLanguage().toUpperCase();
 
     // Clear geocode cache when location changes so a fresh lookup always happens
     if (oldLocation !== app.provider.location) {
@@ -938,6 +975,9 @@ function clayTryDefaults() {
     var prop;
     if (persistClayString === null) {
         console.log('No clay settings found, setting defaults');
+        // Only a fresh install follows the watch language; upgrades stay English.
+        defaults.locale = 'auto';
+        applyRegionalDefaults(defaults, getSettingsLanguage());
         localStorage.setItem('clay-settings', JSON.stringify(defaults));
         return;
     }
@@ -993,6 +1033,7 @@ function getDefaultClaySettings() {
         firstWeek: 'prev',
         faceTheme: 'dark',
         calendarWeeks: '3',
+        locale: 'en',
         colorToday: 0,
         colorSunday: DEFAULT_COLOR_FOLLY,
         colorSaturday: DEFAULT_COLOR_FOLLY,
@@ -1005,6 +1046,22 @@ function getDefaultClaySettings() {
         vibe: false,
         btIcons: 'both'
     };
+}
+
+/**
+ * Adjust fresh-install defaults to the face language.
+ *
+ * @param {Object} defaults Defaults from getDefaultClaySettings(), modified in place.
+ * @param {string} language Language code from getSettingsLanguage().
+ * @returns {Object} The same defaults object.
+ */
+function applyRegionalDefaults(defaults, language) {
+    if (language === 'ru') {
+        defaults.temperatureUnits = 'c';
+        defaults.weekStartDay = 'mon';
+        defaults.holidaySet1 = String(holidays.HOLIDAY_SET_RU);
+    }
+    return defaults;
 }
 
 /**

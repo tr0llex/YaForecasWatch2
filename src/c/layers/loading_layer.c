@@ -1,4 +1,6 @@
 #include "loading_layer.h"
+#include "c/appendix/ui_fonts.h"
+#include "c/appendix/i18n.h"
 #include "c/appendix/theme.h"
 #include "c/appendix/persist.h"
 #include "c/appendix/memory_log.h"
@@ -56,6 +58,12 @@ void loading_layer_refresh() {
     }
     if (!THEME_IS_FIXED) {
         text_layer_set_text_color(s_loading_text_layer, theme_fg());
+    }
+    if (!I18N_IS_FIXED) {
+        const char *text = i18n_no_data();
+        text_layer_set_font(s_loading_text_layer,
+                ui_font_for_text(text, fonts_get_system_font(FONT_KEY_GOTHIC_18), UI_TEXT_MEDIUM));
+        text_layer_set_text(s_loading_text_layer, text);
     }
     if (loading_layer_has_cached_data())
         layer_set_hidden(s_loading_layer, true);

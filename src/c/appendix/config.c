@@ -1,6 +1,7 @@
 #include "config.h"
 #include "persist.h"
 #include "math.h"
+#include "i18n.h"
 #include "memory_log.h"
 #include "c/services/watch_services.h"
 
@@ -42,14 +43,26 @@ static Config config_defaults(void) {
         .color_holiday_2 = GColorVividCerulean,
 #ifndef PBL_PLATFORM_APLITE
         .face_theme = FACE_THEME_DARK,
-        .calendar_weeks = 3
+        .calendar_weeks = 3,
+        .locale = LOCALE_EN
 #endif
     };
 }
 
 static void config_read_or_default(Config *config) {
     *config = config_defaults();
-    persist_get_config(config);
+    if (persist_get_config(config) > 0) {
+        return;
+    }
+#ifndef PBL_PLATFORM_APLITE
+    // Fresh install: follow the watch language, with its conventions.
+    config->locale = LOCALE_AUTO;
+    if (i18n_system_is_ru()) {
+        config->celsius = true;
+        config->start_mon = true;
+        config->holiday_set_1 = HOLIDAY_SET_RU;
+    }
+#endif
 }
 
 void config_load() {
