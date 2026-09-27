@@ -40,23 +40,25 @@ Open source revival of the beloved ForecasWatch watchface. This includes support
 
 * Current time
 * Battery indicator
-* 3 week calendar
+* 2 or 3 week calendar
 * 24 hour weather forecast (updates every 30 minutes)
 * Bluetooth connection indicator
 * Vibrate on disconnect
 * Quiet time indicator
 * Night shading
 * Multiple weather providers (Weather Underground*, OpenWeatherMap, Open-Meteo, Yandex Weather)
-* Current temperature
+* Current temperature and weather condition icon
 * Temperature forecast (red line)
 * UV index forecast (yellow line)
 * Precipitation probability forecast (blue area)
 * City where forecast was fetched
-* Next sunrise or sunset time
+* Next sunrise or sunset time, or the time of the last weather update
 * GPS or manual location entry
 * Fahrenheit and Celsius temperatures
 * Customize time font and color
 * Customize colors for Sundays, Saturdays, and up to two holiday sets
+* Dark and light themes
+* English and Russian language
 * Offline configuration page
 
 *\* Using a hacky workaround*
@@ -80,12 +82,17 @@ YaForecasWatch2 can highlight up to two holiday sets at once:
 
 - US holidays
 - Russian holidays
+- Russian production calendar (non-working days including transfers)
 - Spanish national holidays
 - Spanish national holidays + Catalonia holidays
 
-Holiday data comes from [Nager.Date](https://date.nager.at/). The phone app caches each selected holiday calendar for 30 days in local storage, sends the current/previous/next year to the watch as compact bitsets, and keeps using stale cached data if a refresh fails. This keeps the calendar usable even when the phone is offline.
+Holiday data comes from [Nager.Date](https://date.nager.at/). The Russian production calendar is built in for 2026 and 2027 (preliminary) in `src/pkjs/ru-production-calendar.js` and falls back to Nager.Date for other years. The phone app caches each selected holiday calendar for 30 days in local storage, sends the current/previous/next year to the watch as compact bitsets, and keeps using stale cached data if a refresh fails. This keeps the calendar usable even when the phone is offline.
 
 When both selected holiday sets match the same date, color watches show a split-color highlight. Black-and-white watches use bold holiday dates.
+
+## Language
+
+The Language setting (Auto, English, Russian) applies to the face, the settings page and place names; Auto follows the watch language. Non-Latin text uses a bundled Roboto subset ([SIL OFL](resources/fonts/OFL.txt)). A fresh install in Russian defaults to Celsius, Monday and the Russian production calendar.
 
 ## Platforms
 

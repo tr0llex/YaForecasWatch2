@@ -17,6 +17,16 @@ If you need runtime logs, `mise install-emulator --logs` runs it in an emulator 
 - If a UI element only exists to paint pixels, keep it as light as possible instead of modeling it as a full layer.
 - Avoid floating-point math and 64-bit division in watch-side C, prefer integer multiply-before-divide so linked software math helper code doesn't consume heap. See #163.
 
+## Face Conventions
+
+- Colors go through `theme_bg()`, `theme_fg()`, `theme_pick()` and `theme_readable()` (`theme.h`); the dark theme keeps the original colors.
+- Face strings come from `i18n.c` getters; text that may be non-ASCII is measured and drawn with `ui_font_for_text()` (`ui_fonts.h`).
+- Band rectangles come from `face_layout_compute()` (`face_layout.c`).
+- `CONDITION` in `src/pkjs/weather/conditions.js` and `WeatherCondition` in `condition_icon.h` must match.
+- Settings page translations live in `src/pkjs/clay/i18n.js`, keyed by `messageKey`.
+- Append new `Config` fields at the end and read new Clay tuples as optional in `app_message.c`. Run `pebble clean` after adding a message key.
+- Tests: `node scripts/test-*.js` (after `mise build`, which generates `package.json`).
+
 ## Code Conventions
 
 - For new JavaScript functions, add brief JSDoc (`@param`/`@returns`) annotations since this project does not use TypeScript.
