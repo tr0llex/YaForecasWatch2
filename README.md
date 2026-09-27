@@ -14,7 +14,7 @@ Changes relative to the original ForecasWatch2 watchface:
 
 - Added **Yandex Weather** as a main weather provider, including native temperature, feels-like temperature, rain probability, and UV index forecasts.
 - Added **Open-Meteo** as a separate selectable weather provider rather than an automatic supplement or fallback.
-- Yandex Weather and Open-Meteo refresh **120 minutes after a successful fetch** and retry **60 minutes after a failed fetch**.
+- Open-Meteo refreshes **60 minutes** and Yandex Weather **120 minutes after a successful fetch** (Yandex's free tier allows 30 requests a day); both retry **60 minutes after a failed fetch**.
 - Added **two configurable holiday sets**, with support for US, Russia, Spain national holidays, and Spain national + Catalonia holidays.
 - Holiday data is fetched from **Nager.Date**, cached locally for 30 days, and sent to the watch as compact yearly bitsets so the calendar still works offline.
 - Overlapping holidays from two selected sets are shown with a **split-color date highlight** on color Pebble watches.
