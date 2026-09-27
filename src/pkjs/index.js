@@ -915,7 +915,8 @@ function normalizeHolidaySetId(value) {
         parsed === holidays.HOLIDAY_SET_US ||
         parsed === holidays.HOLIDAY_SET_RU ||
         parsed === holidays.HOLIDAY_SET_ES_NATIONAL ||
-        parsed === holidays.HOLIDAY_SET_ES_CATALONIA
+        parsed === holidays.HOLIDAY_SET_ES_CATALONIA ||
+        parsed === holidays.HOLIDAY_SET_RU_PRODUCTION
     ) {
         return parsed;
     }
@@ -1050,7 +1051,7 @@ function applyRegionalDefaults(defaults, language) {
     if (language === 'ru') {
         defaults.temperatureUnits = 'c';
         defaults.weekStartDay = 'mon';
-        defaults.holidaySet1 = String(holidays.HOLIDAY_SET_RU);
+        defaults.holidaySet1 = String(holidays.HOLIDAY_SET_RU_PRODUCTION);
     }
     return defaults;
 }

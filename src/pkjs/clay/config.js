@@ -218,6 +218,10 @@ var config = [
                     {
                         "label": "Spain + Catalonia",
                         "value": "4"
+                    },
+                    {
+                        "label": "Russia, production calendar",
+                        "value": "5"
                     }
                 ]
             },
@@ -234,6 +238,7 @@ var config = [
                 "label": "Holiday set 2",
                 "messageKey": "holidaySet2",
                 "defaultValue": "0",
+                "description": "The Russian production calendar includes transferred days off. Its 2027 dates are preliminary until the government decree is published.",
                 "options": [
                     {
                         "label": "None",
@@ -254,6 +259,10 @@ var config = [
                     {
                         "label": "Spain + Catalonia",
                         "value": "4"
+                    },
+                    {
+                        "label": "Russia, production calendar",
+                        "value": "5"
                     }
                 ]
             },

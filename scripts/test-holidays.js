@@ -110,4 +110,51 @@ assert.strictEqual(holidays._isStale({ fetchedAtUtc: '2026-01-15T00:00:00.000Z' 
   assert.deepStrictEqual(calls, ['failed_empty']);
 })();
 
+(function testRuProductionBuiltIn() {
+  const WeatherProvider = require('../src/pkjs/weather/provider.js');
+  const originalRequest = WeatherProvider.request;
+  const answers = [];
+
+  WeatherProvider.request = function() {
+    throw new Error('built-in years must not hit the network');
+  };
+  try {
+    holidays._loadHolidaySetYear(holidays.HOLIDAY_SET_RU_PRODUCTION, 2026, function(dates, meta) {
+      answers.push({ dates: dates, meta: meta });
+    });
+  } finally {
+    WeatherProvider.request = originalRequest;
+  }
+  assert.strictEqual(answers.length, 1);
+  assert.strictEqual(answers[0].meta.status, 'builtin');
+  assert.strictEqual(answers[0].meta.preliminary, false);
+  assert.ok(answers[0].dates.indexOf('2026-01-09') !== -1);
+  assert.ok(answers[0].dates.indexOf('2026-12-31') !== -1);
+  assert.strictEqual(holidays.normalizeHolidaySet('5'), holidays.HOLIDAY_SET_RU_PRODUCTION);
+})();
+
+(function testRuProductionFallback() {
+  const WeatherProvider = require('../src/pkjs/weather/provider.js');
+  const originalRequest = WeatherProvider.request;
+  const statuses = [];
+  let requestedUrl = null;
+
+  holidays._loadHolidaySetYear(holidays.HOLIDAY_SET_RU_PRODUCTION, 2027, function(dates, meta) {
+    statuses.push(meta.preliminary);
+  });
+  WeatherProvider.request = function(url, method, onSuccess) {
+    requestedUrl = url;
+    onSuccess(JSON.stringify(sampleRu));
+  };
+  try {
+    holidays._loadHolidaySetYear(holidays.HOLIDAY_SET_RU_PRODUCTION, 2031, function(dates, meta) {
+      statuses.push(meta.status);
+    });
+  } finally {
+    WeatherProvider.request = originalRequest;
+  }
+  assert.deepStrictEqual(statuses, [true, 'fresh']);
+  assert.ok(/\/2031\/RU$/.test(requestedUrl), requestedUrl);
+})();
+
 console.log('Holiday tests passed');

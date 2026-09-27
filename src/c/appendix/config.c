@@ -51,7 +51,7 @@ static void config_read_or_default(Config *config) {
     if (persist_get_config(config) <= 0 && i18n_system_is_ru()) {
         config->celsius = true;
         config->start_mon = true;
-        config->holiday_set_1 = HOLIDAY_SET_RU;
+        config->holiday_set_1 = HOLIDAY_SET_RU_PRODUCTION;
     }
 }
 

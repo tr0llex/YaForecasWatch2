@@ -25,6 +25,7 @@ enum HolidaySet {
     HOLIDAY_SET_RU = 2,
     HOLIDAY_SET_ES_NATIONAL = 3,
     HOLIDAY_SET_ES_CATALONIA = 4,
+    HOLIDAY_SET_RU_PRODUCTION = 5,
 };
 
 typedef struct {

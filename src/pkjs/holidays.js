@@ -4,18 +4,25 @@ var CACHE_VERSION = 'v1';
 var CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 var BITSET_BYTES = 46;
 var NAGER_BASE_URL = 'https://date.nager.at/api/v3/PublicHolidays/';
+var ruProductionCalendar = require('./ru-production-calendar.js');
 
 var HOLIDAY_SET_NONE = 0;
 var HOLIDAY_SET_US = 1;
 var HOLIDAY_SET_RU = 2;
 var HOLIDAY_SET_ES_NATIONAL = 3;
 var HOLIDAY_SET_ES_CATALONIA = 4;
+var HOLIDAY_SET_RU_PRODUCTION = 5;
 
 var HOLIDAY_SOURCES = {};
 HOLIDAY_SOURCES[HOLIDAY_SET_US] = { countryCode: 'US', scope: 'national' };
 HOLIDAY_SOURCES[HOLIDAY_SET_RU] = { countryCode: 'RU', scope: 'national' };
 HOLIDAY_SOURCES[HOLIDAY_SET_ES_NATIONAL] = { countryCode: 'ES', scope: 'national' };
 HOLIDAY_SOURCES[HOLIDAY_SET_ES_CATALONIA] = { countryCode: 'ES', scope: 'catalonia' };
+HOLIDAY_SOURCES[HOLIDAY_SET_RU_PRODUCTION] = {
+    countryCode: 'RU',
+    scope: 'national',
+    builtIn: ruProductionCalendar
+};
 
 var rawCountryYearCache = {};
 
@@ -259,6 +266,21 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
         return;
     }
 
+    if (source.builtIn && source.builtIn.datesForYear(year)) {
+        if (typeof debugLog === 'function') {
+            debugLog('holiday_builtin', {
+                holidaySet: holidaySet,
+                year: year,
+                preliminary: source.builtIn.isPreliminary(year)
+            });
+        }
+        answer(source.builtIn.datesForYear(year), {
+            status: 'builtin',
+            preliminary: source.builtIn.isPreliminary(year)
+        });
+        return;
+    }
+
     key = cacheKey(source.countryCode, source.scope, year);
     cached = readCache(key);
 
@@ -487,6 +509,7 @@ module.exports = {
     HOLIDAY_SET_RU: HOLIDAY_SET_RU,
     HOLIDAY_SET_ES_NATIONAL: HOLIDAY_SET_ES_NATIONAL,
     HOLIDAY_SET_ES_CATALONIA: HOLIDAY_SET_ES_CATALONIA,
+    HOLIDAY_SET_RU_PRODUCTION: HOLIDAY_SET_RU_PRODUCTION,
     filterHolidayDates: filterHolidayDates,
     packHolidayBits: packHolidayBits,
     sendHolidayBitsets: sendHolidayBitsets,
