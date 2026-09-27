@@ -2,6 +2,8 @@
 
 #include <pebble.h>
 
+int calendar_status_layer_height(void);
+
 void calendar_status_layer_create(Layer* parent_layer, GRect frame);
 
 void status_icons_refresh();

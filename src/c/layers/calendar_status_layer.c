@@ -15,10 +15,12 @@
 #define STATUS_ICON_Y(bounds_h, icon_h) (((bounds_h) - (icon_h)) / 2)
 #define BATTERY_Y(bounds_h) (((bounds_h) - BATTERY_H) / 2)
 #define MONTH_FONT_KEY FONT_KEY_GOTHIC_24
+#define STATUS_ROW_H 20
 #else
 #define STATUS_ICON_Y(bounds_h, icon_h) ((void)(bounds_h), (void)(icon_h), 0)
 #define BATTERY_Y(bounds_h) ((void)(bounds_h), 1)
 #define MONTH_FONT_KEY FONT_KEY_GOTHIC_18
+#define STATUS_ROW_H 13
 #endif
 
 static Layer *s_calendar_status_layer;
@@ -147,6 +149,10 @@ static void calendar_status_update_proc(Layer *layer, GContext *ctx) {
     }
 
     draw_month_text(ctx, bounds);
+}
+
+int calendar_status_layer_height(void) {
+    return STATUS_ROW_H;
 }
 
 void calendar_status_layer_create(Layer* parent_layer, GRect frame) {

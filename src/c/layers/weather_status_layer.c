@@ -9,6 +9,7 @@
 #define CITY_INIT_WIDTH 100
 #define MARGIN 2
 #define FEELS_LIKE_UNAVAILABLE (-32767 - 1)
+#define WEATHER_ROW_H 14
 
 // emery: use larger text and arrow geometry
 #ifdef PBL_PLATFORM_EMERY
@@ -213,6 +214,10 @@ static void weather_status_update_proc(Layer *layer, GContext *ctx) {
     graphics_context_set_fill_color(ctx, GColorWhite);
     gpath_draw_filled(ctx, s_arrow_path);
     MEMORY_LOG_HEAP("weather_status_update:exit");
+}
+
+int weather_status_layer_height(void) {
+    return WEATHER_ROW_H;
 }
 
 void weather_status_layer_create(Layer* parent_layer, GRect frame) {
