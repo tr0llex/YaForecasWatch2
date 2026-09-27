@@ -211,6 +211,7 @@ Pebble.addEventListener('ready',
             // that bundled the deterministic Chicago screenshot fixture.
             localStorage.removeItem(KEY_LAST_FETCH_SUCCESS);
             localStorage.setItem(KEY_UV_FIXTURE_CLEANUP, 'complete');
+            holidays.sendHolidayBitsets(app.settings, null, appendDebugWeatherLog);
             app.pendingStartupFetch = false;
             fetch(app.provider, true, false);
             startTick();

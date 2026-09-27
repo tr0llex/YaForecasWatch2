@@ -10,7 +10,8 @@ enum key {
 }; // Deprecated: BATTERY_LEVEL
 
 static int holiday_key(uint8_t slot, int16_t year) {
-    const int16_t bucket = (int16_t)(year % 3);
+    // Keep negative years inside the slot.
+    const int16_t bucket = (int16_t)(((year % 3) + 3) % 3);
 
     if (slot == 1) {
         return HOLIDAY_SLOT1_YEAR0 + bucket;

@@ -230,6 +230,23 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
     var key;
     var cached;
     var nowMs = Date.now();
+    var answered = false;
+
+    /**
+     * Report the dates at most once: sendHolidayBitsets() advances its queue
+     * from this callback.
+     *
+     * @param {string[]} dates Holiday dates.
+     * @param {Object} meta Load metadata.
+     * @returns {void}
+     */
+    function answer(dates, meta) {
+        if (answered) {
+            return;
+        }
+        answered = true;
+        onReady(dates, meta);
+    }
 
     if (!source) {
         if (typeof debugLog === 'function') {
@@ -238,7 +255,7 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
                 year: year
             });
         }
-        onReady([], { status: 'disabled' });
+        answer([], { status: 'disabled' });
         return;
     }
 
@@ -259,7 +276,7 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
                     dates: dates.length
                 });
             }
-            onReady(dates, { status: 'fresh', source: fresh.source });
+            answer(dates, { status: 'fresh', source: fresh.source });
         }, function(error) {
             console.log('[holidays] refresh failed for ' + key + ': ' + JSON.stringify(error));
             if (typeof debugLog === 'function') {
@@ -272,9 +289,7 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
                     error: error
                 });
             }
-            if (!cached) {
-                onReady([], { status: 'failed_empty', error: error });
-            }
+            answer([], { status: 'failed_empty', error: error });
         }, debugLog);
     }
 
@@ -289,7 +304,7 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
                 fetchedAtUtc: cached.fetchedAtUtc
             });
         }
-        onReady(cached.dates, {
+        answer(cached.dates, {
             status: isStale(cached, nowMs) ? 'stale' : 'cached',
             source: cached.source
         });
@@ -476,6 +491,7 @@ module.exports = {
     packHolidayBits: packHolidayBits,
     sendHolidayBitsets: sendHolidayBitsets,
     normalizeHolidaySet: normalizeHolidaySet,
+    _loadHolidaySetYear: loadHolidaySetYear,
     _cacheKey: cacheKey,
     _isStale: isStale
 };

@@ -64,4 +64,50 @@ assert.strictEqual(holidays.normalizeHolidaySet('bogus'), holidays.HOLIDAY_SET_N
 assert.strictEqual(holidays._isStale({ fetchedAtUtc: '2026-01-01T00:00:00.000Z' }, Date.parse('2026-02-01T00:00:01.000Z')), true);
 assert.strictEqual(holidays._isStale({ fetchedAtUtc: '2026-01-15T00:00:00.000Z' }, Date.parse('2026-02-01T00:00:01.000Z')), false);
 
+(function testStaleCacheAnswersOnce() {
+  const WeatherProvider = require('../src/pkjs/weather/provider.js');
+  const originalRequest = WeatherProvider.request;
+  const originalGetItem = global.localStorage.getItem;
+  const stale = JSON.stringify({
+    fetchedAtUtc: '2000-01-01T00:00:00.000Z',
+    source: 'US:national:2026',
+    dates: ['2026-01-01']
+  });
+  const calls = [];
+
+  global.localStorage.getItem = function() {
+    return stale;
+  };
+  WeatherProvider.request = function(url, method, onSuccess) {
+    onSuccess(JSON.stringify(sampleUs));
+  };
+  try {
+    holidays._loadHolidaySetYear(holidays.HOLIDAY_SET_US, 2026, function(dates, meta) {
+      calls.push(meta.status);
+    });
+  } finally {
+    WeatherProvider.request = originalRequest;
+    global.localStorage.getItem = originalGetItem;
+  }
+  assert.deepStrictEqual(calls, ['stale']);
+})();
+
+(function testFailedRefreshAnswersOnce() {
+  const WeatherProvider = require('../src/pkjs/weather/provider.js');
+  const originalRequest = WeatherProvider.request;
+  const calls = [];
+
+  WeatherProvider.request = function(url, method, onSuccess, onFailure) {
+    onFailure({ code: 'offline' });
+  };
+  try {
+    holidays._loadHolidaySetYear(holidays.HOLIDAY_SET_ES_NATIONAL, 2031, function(dates, meta) {
+      calls.push(meta.status);
+    });
+  } finally {
+    WeatherProvider.request = originalRequest;
+  }
+  assert.deepStrictEqual(calls, ['failed_empty']);
+})();
+
 console.log('Holiday tests passed');
