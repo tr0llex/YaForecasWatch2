@@ -1,3 +1,4 @@
+var conditions = require('./conditions.js');
 var SunCalc = require('suncalc');
 var storageKeys = require('../storage-keys.js');
 
@@ -258,6 +259,9 @@ function writeGeocodeBackoff() {
 
 var WeatherProvider = function() {
     this.numEntries = 24;
+    this.condition = conditions.CONDITION.UNKNOWN;
+    // Unix seconds the data was fetched; null means "just now".
+    this.fetchedAt = null;
     this.geocodeLanguage = 'EN';
     this.name = 'Template';
     this.id = 'interface';
@@ -785,11 +789,16 @@ WeatherProvider.prototype.getPayload = function() {
         CURRENT_FEELS_LIKE: currentFeelsLike,
         CITY: this.cityName,
         // The first byte determines whether the list of events starts on a sunrise (0) or sunset (1)
-        SUN_EVENTS: [this.sunEvents[0].type === 'sunrise' ? 0 : 1].concat(sunEventsByteArray)
+        SUN_EVENTS: [this.sunEvents[0].type === 'sunrise' ? 0 : 1].concat(sunEventsByteArray),
+        CONDITION: conditions.normalize(this.condition),
+        WEATHER_FETCHED_AT: typeof this.fetchedAt === 'number' && isFinite(this.fetchedAt)
+            ? Math.floor(this.fetchedAt)
+            : Math.floor(Date.now() / 1000)
     };
     return payload;
 };
 
 WeatherProvider.request = request;
+WeatherProvider.CONDITION = conditions.CONDITION;
 
 module.exports = WeatherProvider;

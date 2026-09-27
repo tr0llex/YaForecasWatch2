@@ -3,6 +3,7 @@
 #include "c/appendix/ui_fonts.h"
 #include "c/appendix/i18n.h"
 #include "c/appendix/theme.h"
+#include "condition_icon.h"
 #include "c/appendix/persist.h"
 #include "c/appendix/config.h"
 #include "c/appendix/memory_log.h"
@@ -22,6 +23,7 @@
 #define ARROW_HEAD_H 4
 #define ARROW_HEAD_W 3
 #define ARROW_W 8
+#define CONDITION_ICON_W 14
 #else
 #define CITY_FONT_KEY FONT_KEY_GOTHIC_14
 #define CITY_TEXT_SIZE UI_TEXT_SMALL
@@ -30,6 +32,16 @@
 #define ARROW_HEAD_H 3
 #define ARROW_HEAD_W 2
 #define ARROW_W 6
+#define CONDITION_ICON_W 12
+#endif
+#define CONDITION_ICON_GAP 2
+// aplite: the condition icon and the update time are left out to save heap.
+#ifndef PBL_PLATFORM_APLITE
+#define WEATHER_ROW_EXTRAS
+// Read from storage on refresh, not on every redraw.
+static int s_condition;
+static time_t s_weather_fetched;
+static GRect s_condition_icon_frame;
 #endif
 
 static GRect frame_curr_temp;
@@ -127,21 +139,49 @@ static void city_layer_refresh() {
 static void current_temp_layer_refresh() {
     static char s_temp_buffer[16];
     int feels_like = persist_get_current_feels_like();
+#ifdef WEATHER_ROW_EXTRAS
+    const bool show_icon = g_config->show_condition && condition_icon_is_known(s_condition);
+    const int icon_w = show_icon ? CONDITION_ICON_W + CONDITION_ICON_GAP : 0;
+    const char *lead = show_icon ? "" : "• ";
+#else
+    const int icon_w = 0;
+    const char *lead = "• ";
+#endif
     if (g_config->show_feels_like && feels_like != FEELS_LIKE_UNAVAILABLE) {
-        snprintf(s_temp_buffer, sizeof(s_temp_buffer), "• %d (%d)",
+        snprintf(s_temp_buffer, sizeof(s_temp_buffer), "%s%d (%d)", lead,
             config_localize_temp(persist_get_current_temp()),
             config_localize_temp(feels_like));
     }
     else {
-        snprintf(s_temp_buffer, sizeof(s_temp_buffer), "• %d", config_localize_temp(persist_get_current_temp()));
+        snprintf(s_temp_buffer, sizeof(s_temp_buffer), "%s%d", lead,
+            config_localize_temp(persist_get_current_temp()));
     }
     text_layer_set_text(s_current_temp_layer, s_temp_buffer);
 
     // Dynamic resizing
     text_layer_move_frame(s_current_temp_layer, GRect(0, 0, 100, 100));  // Make it big so content doesn't get clipped
     GSize size = text_layer_get_content_size(s_current_temp_layer);
-    text_layer_move_frame(s_current_temp_layer, GRect(MARGIN, -FONT_18_OFFSET, size.w, size.h));
-    frame_curr_temp = GRect(0, -FONT_18_OFFSET, size.w + MARGIN, size.h);
+#ifdef WEATHER_ROW_EXTRAS
+    const GRect bounds = layer_get_bounds(s_weather_status_layer);
+    s_condition_icon_frame = show_icon
+        ? GRect(MARGIN, (bounds.size.h - CONDITION_ICON_W) / 2, CONDITION_ICON_W, CONDITION_ICON_W)
+        : GRect(0, 0, 0, 0);
+#endif
+    text_layer_move_frame(s_current_temp_layer, GRect(MARGIN + icon_w, -FONT_18_OFFSET, size.w, size.h));
+    frame_curr_temp = GRect(0, -FONT_18_OFFSET, size.w + MARGIN + icon_w, size.h);
+}
+
+#ifdef WEATHER_ROW_EXTRAS
+static bool show_updated_time(void) {
+    return g_config->weather_time == WEATHER_TIME_UPDATED && s_weather_fetched > 0;
+}
+#endif
+
+static void load_stored_weather_extras(void) {
+#ifdef WEATHER_ROW_EXTRAS
+    s_condition = persist_get_condition();
+    s_weather_fetched = persist_get_weather_updated();
+#endif
 }
 
 static void sun_event_layer_refresh() {
@@ -149,6 +189,11 @@ static void sun_event_layer_refresh() {
     // Get the time of the first sun event
     time_t first_sun_event_time;
     persist_get_sun_event_times(&first_sun_event_time, 1);
+#ifdef WEATHER_ROW_EXTRAS
+    if (show_updated_time()) {
+        first_sun_event_time = s_weather_fetched;
+    }
+#endif
     struct tm *sun_time = localtime(&first_sun_event_time);
 
     static char s_buffer[8];
@@ -198,6 +243,7 @@ static void weather_status_layer_init(GRect bounds) {
     text_layer_set_text_color(s_next_sun_event_layer, theme_fg());
     text_layer_set_font(s_next_sun_event_layer, fonts_get_system_font(SUN_EVENT_FONT_KEY));
 
+    load_stored_weather_extras();
     current_temp_layer_refresh();
     sun_event_layer_refresh();
     city_layer_refresh();
@@ -207,6 +253,9 @@ static void weather_status_update_proc(Layer *layer, GContext *ctx) {
     MEMORY_LOG_HEAP("weather_status_update:enter");
     GRect bounds = layer_get_bounds(layer);
     int w = bounds.size.w;
+#ifdef WEATHER_ROW_EXTRAS
+    condition_icon_draw(ctx, s_condition_icon_frame, s_condition);
+#endif
     if (!s_arrow_path) {
         MEMORY_LOG_HEAP("weather_status_update:missing_arrow_path");
         return;
@@ -222,6 +271,21 @@ static void weather_status_update_proc(Layer *layer, GContext *ctx) {
     gpath_move_to(s_arrow_path, GPoint(w - 4, bounds.size.h - (ARROW_H / 2) - 4));
 #else
     gpath_move_to(s_arrow_path, GPoint(w - 4, 6));
+#endif
+#ifdef WEATHER_ROW_EXTRAS
+    if (show_updated_time()) {
+        const GPoint center = s_arrow_path->offset;
+        const int r = ARROW_W / 2;
+        const GRect ring = GRect(center.x - r, center.y - r, r * 2 + 1, r * 2 + 1);
+        graphics_context_set_stroke_color(ctx, theme_fg());
+        graphics_context_set_stroke_width(ctx, 1);
+        graphics_draw_arc(ctx, ring, GOvalScaleModeFitCircle,
+                          DEG_TO_TRIGANGLE(45), DEG_TO_TRIGANGLE(360));
+        graphics_draw_pixel(ctx, GPoint(center.x - 1, center.y - r - 1));
+        graphics_draw_pixel(ctx, GPoint(center.x - 1, center.y - r + 1));
+        graphics_draw_pixel(ctx, GPoint(center.x + 1, center.y - r));
+        return;
+    }
 #endif
     graphics_context_set_stroke_color(ctx, theme_fg());
     gpath_draw_outline_open(ctx, s_arrow_path);
@@ -261,6 +325,7 @@ void weather_status_layer_refresh() {
         text_layer_set_text_color(s_city_layer, theme_fg());
         text_layer_set_text_color(s_next_sun_event_layer, theme_fg());
     }
+    load_stored_weather_extras();
     current_temp_layer_refresh();
     sun_event_layer_refresh();
     city_layer_refresh();

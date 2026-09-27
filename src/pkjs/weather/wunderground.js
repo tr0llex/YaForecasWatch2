@@ -1,4 +1,5 @@
 var WeatherProvider = require('./provider.js');
+var conditions = require('./conditions.js');
 var request = WeatherProvider.request;
 
 var WundergroundProvider = function() {
@@ -73,6 +74,9 @@ WundergroundProvider.prototype.withWundergroundCurrent = function(lat, lon, apiK
                 temp: weatherData.temperature,
                 feelsLike: typeof weatherData.temperatureFeelsLike === 'number'
                     ? weatherData.temperatureFeelsLike
+                    : null,
+                iconCode: typeof weatherData.iconCode === 'number'
+                    ? weatherData.iconCode
                     : null
             });
         }).bind(this),
@@ -172,6 +176,7 @@ WundergroundProvider.prototype.withApiKey = function(callback, onFailure) {
 WundergroundProvider.prototype.withProviderData = function(lat, lon, force, onSuccess, onFailure) {
     // onSuccess expects that this.hasValidData() will be true
     var currentTemp;
+    var currentIconCode = null;
     var forecast;
     var uvData;
     var currentReady = false;
@@ -231,11 +236,14 @@ WundergroundProvider.prototype.withProviderData = function(lat, lon, force, onSu
             });
             this.startTime = forecast[0].fcst_valid;
             this.currentTemp = currentTemp;
+            this.condition = conditions.fromWeatherCompany(
+                currentIconCode !== null ? currentIconCode : forecast[0].icon_code);
             onSuccess();
         }).bind(this);
 
         this.withWundergroundCurrent(lat, lon, apiKey, function(value) {
             currentTemp = value.temp;
+            currentIconCode = value.iconCode;
             this.currentFeelsLike = value.feelsLike;
             currentReady = true;
             complete();

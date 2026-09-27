@@ -50,6 +50,10 @@ int persist_get_sun_event_times(time_t *buffer, const size_t buffer_size);
 
 int persist_get_config(Config *config);
 
+int persist_get_condition();
+
+time_t persist_get_weather_updated();
+
 bool persist_get_debug_fetch_error();
 
 int persist_get_debug_weather_state();
@@ -83,6 +87,10 @@ void persist_set_sun_event_start_type(int val);
 void persist_set_sun_event_times(time_t *data, const size_t size);
 
 void persist_set_config(Config config);
+
+void persist_set_condition(int val);
+
+void persist_set_weather_updated(time_t val);
 
 void persist_set_debug_fetch_error(bool val);
 

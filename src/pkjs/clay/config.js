@@ -333,6 +333,31 @@ var config = [
                 "capabilities": ["COLOR"]
             },
             {
+                "type": "toggle",
+                "label": "Show weather condition icon",
+                "messageKey": "showCondition",
+                "defaultValue": false,
+                "capabilities": ["NOT_PLATFORM_APLITE"],
+                "description": "Replaces the dot before the current temperature with an icon when the provider reports the condition."
+            },
+            {
+                "type": "select",
+                "label": "Time in the weather row",
+                "messageKey": "weatherTime",
+                "defaultValue": "sun",
+                "capabilities": ["NOT_PLATFORM_APLITE"],
+                "options": [
+                    {
+                        "label": "Next sunrise or sunset",
+                        "value": "sun"
+                    },
+                    {
+                        "label": "Last weather update",
+                        "value": "updated"
+                    }
+                ]
+            },
+            {
                 "type": "radiogroup",
                 "label": "Provider",
                 "messageKey": "provider",

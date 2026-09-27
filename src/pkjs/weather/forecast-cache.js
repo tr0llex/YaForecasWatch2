@@ -1,3 +1,4 @@
+var conditions = require('./conditions.js');
 var UV_UNAVAILABLE = null;
 var CACHE_COORDINATE_MATCH_KM = 25;
 
@@ -212,6 +213,10 @@ function populateProviderFromCache(provider, cache, windowTimes, sourceName) {
     provider.startTime = windowTimes[0];
     provider.currentTemp = fallbackTemp;
     provider.currentFeelsLike = finiteNumber(cache.currentFeelsLike);
+    provider.condition = conditions.normalize(cache.condition);
+    provider.fetchedAt = typeof cache.fetchedAtUtc === 'string' && isFinite(Date.parse(cache.fetchedAtUtc))
+        ? Date.parse(cache.fetchedAtUtc) / 1000
+        : null;
     provider.tempTrend = [];
     provider.feelsLikeTrend = [];
     provider.precipTrend = [];

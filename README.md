@@ -52,7 +52,8 @@ Open source revival of the beloved ForecasWatch watchface. This includes support
 * UV index forecast (yellow line)
 * Precipitation probability forecast (blue area)
 * City where forecast was fetched
-* Next sunrise or sunset time
+* Next sunrise or sunset time, or the time of the last weather update (not on aplite)
+* Optional weather condition icon (not on aplite)
 * GPS or manual location entry
 * Fahrenheit and Celsius temperatures
 * Customize time font and color

@@ -276,6 +276,7 @@ Fixtures currently support:
 - `weather.precipPct`: hourly precipitation percentages, 0-100.
 - `weather.uvIndex`: hourly UV index values.
 - `weather.sunEvents`: the next two sun events as local fields, e.g. `{ "type": "sunset", "dayOffset": 0, "hour": 20, "minute": 10 }`.
+- `weather.condition`: optional current condition code from `src/pkjs/weather/conditions.js` (0 unknown, 1 clear ... 7 fog); drawn only with `"showCondition": true` in `claySettings`.
 
 Minimal `.env`:
 
