@@ -10,6 +10,21 @@
 #include "c/windows/main_window.h"
 #include "memory_log.h"
 
+// Optional settings; a missing tuple keeps the default. aplite leaves these
+// face options out to keep its heap headroom.
+#ifdef PBL_PLATFORM_APLITE
+#define read_face_options(iterator, config)
+#else
+static void read_face_options(DictionaryIterator *iterator, Config *config) {
+    Tuple *tuple;
+    tuple = dict_find(iterator, MESSAGE_KEY_CLAY_FACE_THEME);
+    config->face_theme = tuple && tuple->value->int32 == FACE_THEME_LIGHT
+        ? FACE_THEME_LIGHT : FACE_THEME_DARK;
+    tuple = dict_find(iterator, MESSAGE_KEY_CLAY_CALENDAR_WEEKS);
+    config->calendar_weeks = tuple && tuple->value->int32 == 2 ? 2 : 3;
+}
+#endif
+
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
     APP_LOG(APP_LOG_LEVEL_INFO, "Message received!");
     // Weather data
@@ -189,6 +204,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
             .color_holiday_1 = color_holiday_1,
             .color_holiday_2 = color_holiday_2
         };
+        read_face_options(iterator, &config);
         persist_set_config(config);
         main_window_refresh();
     }

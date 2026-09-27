@@ -40,7 +40,7 @@ Open source revival of the beloved ForecasWatch watchface. This includes support
 
 * Current time
 * Battery indicator
-* 3 week calendar
+* 2 or 3 week calendar (3 on aplite)
 * 24 hour weather forecast (updates every 30 minutes)
 * Bluetooth connection indicator
 * Vibrate on disconnect
@@ -57,6 +57,7 @@ Open source revival of the beloved ForecasWatch watchface. This includes support
 * Fahrenheit and Celsius temperatures
 * Customize time font and color
 * Customize colors for Sundays, Saturdays, and up to two holiday sets
+* Dark and light themes (not on aplite)
 * Offline configuration page
 
 *\* Using a hacky workaround*

@@ -8,6 +8,11 @@ enum TimeFont {
     TIME_FONT_BITHAM = 2,
 };
 
+enum FaceTheme {
+    FACE_THEME_DARK = 0,
+    FACE_THEME_LIGHT = 1,
+};
+
 enum HolidaySet {
     HOLIDAY_SET_NONE = 0,
     HOLIDAY_SET_US = 1,
@@ -40,6 +45,11 @@ typedef struct {
     GColor color_holiday_2;
     bool show_feels_like;
     GColor color_feels_like;
+    // Append only: older stored configs keep defaults for newer fields.
+#ifndef PBL_PLATFORM_APLITE
+    uint8_t face_theme;
+    uint8_t calendar_weeks;
+#endif
 } Config;
 
 extern Config *g_config;
@@ -57,6 +67,13 @@ int config_format_time(char *s, size_t maxsize, const struct tm * tm_p);
 int config_axis_hour(int hour);
 
 int config_n_today();
+
+#ifdef PBL_PLATFORM_APLITE
+// aplite: always three weeks, to keep its heap headroom.
+#define config_calendar_weeks() 3
+#else
+int config_calendar_weeks();
+#endif
 
 GFont config_time_font();
 

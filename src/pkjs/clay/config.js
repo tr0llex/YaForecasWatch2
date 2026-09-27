@@ -13,6 +13,33 @@ var config = [
     },
     {
         "type": "section",
+        "capabilities": ["NOT_PLATFORM_APLITE"],
+        "items": [
+            {
+                "type": "heading",
+                "defaultValue": "Face",
+            },
+            {
+                "type": "select",
+                "label": "Theme",
+                "messageKey": "faceTheme",
+                "defaultValue": "dark",
+                "capabilities": ["NOT_PLATFORM_APLITE"],
+                "options": [
+                    {
+                        "label": "Dark",
+                        "value": "dark"
+                    },
+                    {
+                        "label": "Light",
+                        "value": "light"
+                    }
+                ]
+            },
+        ]
+    },
+    {
+        "type": "section",
         "items": [
             {
                 "type": "heading",
@@ -95,6 +122,23 @@ var config = [
                     {
                         "label": "Monday",
                         "value": "mon"
+                    }
+                ]
+            },
+            {
+                "type": "select",
+                "label": "Weeks to display",
+                "messageKey": "calendarWeeks",
+                "defaultValue": "3",
+                "capabilities": ["NOT_PLATFORM_APLITE"],
+                "options": [
+                    {
+                        "label": "2",
+                        "value": "2"
+                    },
+                    {
+                        "label": "3",
+                        "value": "3"
                     }
                 ]
             },

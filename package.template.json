@@ -109,7 +109,9 @@
       "HOLIDAY_SET",
       "HOLIDAY_YEAR",
       "HOLIDAY_BITS",
-      "DEBUG_WEATHER_STATE"
+      "DEBUG_WEATHER_STATE",
+      "CLAY_FACE_THEME",
+      "CLAY_CALENDAR_WEEKS"
     ]
   }
 }
