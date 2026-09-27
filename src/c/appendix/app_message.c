@@ -9,6 +9,7 @@
 #include "c/layers/calendar_status_layer.h"
 #include "c/windows/main_window.h"
 #include "memory_log.h"
+#include "c/services/watch_services.h"
 
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
     APP_LOG(APP_LOG_LEVEL_INFO, "Message received!");
@@ -22,6 +23,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     Tuple *current_temp_tuple = dict_find(iterator, MESSAGE_KEY_CURRENT_TEMP);
     Tuple *current_feels_like_tuple = dict_find(iterator, MESSAGE_KEY_CURRENT_FEELS_LIKE);
     Tuple *city_tuple = dict_find(iterator, MESSAGE_KEY_CITY);
+    Tuple *condition_tuple = dict_find(iterator, MESSAGE_KEY_CONDITION);
     Tuple *sun_events_tuple = dict_find(iterator, MESSAGE_KEY_SUN_EVENTS);
     Tuple *debug_fetch_error_tuple = dict_find(iterator, MESSAGE_KEY_DEBUG_FETCH_ERROR);
     Tuple *debug_weather_state_tuple = dict_find(iterator, MESSAGE_KEY_DEBUG_WEATHER_STATE);
@@ -56,6 +58,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     Tuple *clay_color_feels_like_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_COLOR_FEELS_LIKE);
     Tuple *clay_face_theme_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_FACE_THEME);
     Tuple *clay_locale_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_LOCALE);
+    Tuple *clay_weather_time_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_WEATHER_TIME);
 
     if(temp_trend_tuple && precip_trend_tuple && uv_trend_tuple && forecast_start_tuple && num_entries_tuple
         && current_temp_tuple && city_tuple && sun_events_tuple) {
@@ -103,6 +106,8 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         time_t *sun_event_times = (time_t*) (sun_events_tuple->value->data + 1);
         persist_set_sun_event_start_type(sun_event_start_type);
         persist_set_sun_event_times(sun_event_times, 2);
+        persist_set_condition(condition_tuple ? (int)condition_tuple->value->int32 : 0);
+        persist_set_weather_updated(watch_services_now());
         loading_layer_refresh();
         forecast_layer_refresh();
         weather_status_layer_refresh();
@@ -178,6 +183,10 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         if (locale > LOCALE_RU) {
             locale = LOCALE_AUTO;
         }
+        const uint8_t weather_time = clay_weather_time_tuple
+            && clay_weather_time_tuple->value->int32 == WEATHER_TIME_UPDATED
+            ? WEATHER_TIME_UPDATED
+            : WEATHER_TIME_SUN_EVENT;
         Config config = (Config) {
             .celsius = clay_celsius,
             .time_lead_zero = time_lead_zero,
@@ -203,7 +212,8 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
             .color_holiday_1 = color_holiday_1,
             .color_holiday_2 = color_holiday_2,
             .face_theme = face_theme,
-            .locale = locale
+            .locale = locale,
+            .weather_time = weather_time
         };
         persist_set_config(config);
         main_window_refresh();

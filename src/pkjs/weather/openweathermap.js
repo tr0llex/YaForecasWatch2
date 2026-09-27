@@ -1,4 +1,5 @@
 var WeatherProvider = require('./provider.js');
+var conditions = require('./conditions.js');
 var request = WeatherProvider.request;
 
 var OpenWeatherMapProvider = function(apiKey) {
@@ -111,6 +112,10 @@ OpenWeatherMapProvider.prototype.withProviderData = function(lat, lon, force, on
         this.currentFeelsLike = typeof weatherData.current.feels_like === 'number'
             ? weatherData.current.feels_like
             : null;
+        this.condition = conditions.fromOpenWeatherMap(
+            Array.isArray(weatherData.current.weather) && weatherData.current.weather[0]
+                ? weatherData.current.weather[0].id
+                : null);
         onSuccess();
     }).bind(this), onFailure);
 };

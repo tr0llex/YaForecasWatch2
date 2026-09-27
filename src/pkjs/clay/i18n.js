@@ -75,6 +75,10 @@ var TRANSLATIONS = {
                 description: 'Ощущаемая температура точками на графике, если источник её сообщает.'
             },
             colorFeelsLike: { label: 'Цвет «ощущается как»' },
+            weatherTime: {
+                label: 'Время в строке погоды',
+                options: { sun: 'Ближайший восход или закат', updated: 'Последнее обновление погоды' }
+            },
             provider: {
                 label: 'Источник погоды',
                 options: { yandex: 'Яндекс Погода' }

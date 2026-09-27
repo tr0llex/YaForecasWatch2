@@ -19,6 +19,11 @@ enum Locale {
     LOCALE_RU = 2,
 };
 
+enum WeatherTime {
+    WEATHER_TIME_SUN_EVENT = 0,
+    WEATHER_TIME_UPDATED = 1,
+};
+
 enum HolidaySet {
     HOLIDAY_SET_NONE = 0,
     HOLIDAY_SET_US = 1,
@@ -55,6 +60,7 @@ typedef struct {
     // Append only: older stored configs keep defaults for newer fields.
     uint8_t face_theme;
     uint8_t locale;
+    uint8_t weather_time;
 } Config;
 
 extern Config *g_config;

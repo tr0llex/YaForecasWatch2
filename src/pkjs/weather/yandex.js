@@ -1,6 +1,7 @@
 var WeatherProvider = require('./provider.js');
 var forecastCache = require('./forecast-cache.js');
 var storageKeys = require('../storage-keys.js');
+var conditions = require('./conditions.js');
 var request = WeatherProvider.request;
 
 var YANDEX_API_URL = 'https://api.weather.yandex.ru/graphql/query';
@@ -157,6 +158,7 @@ function buildYandexCache(weatherData, lat, lon, cityName, countryCode) {
         currentFeelsLike: typeof now.feelsLike === 'number'
             ? celsiusToFahrenheit(now.feelsLike)
             : null,
+        condition: conditions.fromYandex(now.condition),
         hourly: getHourlyForecast(weatherData)
     };
 }

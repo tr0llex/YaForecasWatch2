@@ -313,6 +313,22 @@ var config = [
                 "capabilities": ["COLOR"]
             },
             {
+                "type": "select",
+                "label": "Time in the weather row",
+                "messageKey": "weatherTime",
+                "defaultValue": "sun",
+                "options": [
+                    {
+                        "label": "Next sunrise or sunset",
+                        "value": "sun"
+                    },
+                    {
+                        "label": "Last weather update",
+                        "value": "updated"
+                    }
+                ]
+            },
+            {
                 "type": "radiogroup",
                 "label": "Provider",
                 "messageKey": "provider",

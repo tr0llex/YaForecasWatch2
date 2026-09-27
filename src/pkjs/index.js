@@ -867,6 +867,7 @@ function sendClaySettings(onSuccess, onFailure) {
         "CLAY_START_MON": app.settings.weekStartDay === 'mon',
         "CLAY_PREV_WEEK": app.settings.firstWeek === 'prev',
         "CLAY_FACE_THEME": app.settings.faceTheme === 'light' ? 1 : 0,
+        "CLAY_WEATHER_TIME": app.settings.weatherTime === 'updated' ? 1 : 0,
         "CLAY_LOCALE": ['auto', 'en', 'ru'].indexOf(app.settings.locale) > 0
             ? ['auto', 'en', 'ru'].indexOf(app.settings.locale)
             : 0,
@@ -1026,6 +1027,7 @@ function getDefaultClaySettings() {
         firstWeek: 'prev',
         faceTheme: 'dark',
         locale: 'auto',
+        weatherTime: 'sun',
         colorToday: 0,
         colorSunday: DEFAULT_COLOR_FOLLY,
         colorSaturday: DEFAULT_COLOR_FOLLY,
@@ -1295,6 +1297,7 @@ function getFixtureWeatherPayload(fixture) {
     }) : [];
     provider.uvTrend = Array.isArray(weather.uvIndex) ? weather.uvIndex.slice(0) : [];
     provider.sunEvents = sunEvents;
+    provider.condition = typeof weather.condition === 'number' ? weather.condition : 0;
 
     if (provider.numEntries <= 0 || sunEvents.length < 2 || !provider.hasValidData()) {
         console.log('[fixture] Invalid weather data in fixture ' + (fixture.name || '(unknown)'));

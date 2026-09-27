@@ -1,13 +1,14 @@
 var WeatherProvider = require('./provider.js');
 var forecastCache = require('./forecast-cache.js');
 var storageKeys = require('../storage-keys.js');
+var conditions = require('./conditions.js');
 var request = WeatherProvider.request;
 
 var OPEN_METEO_API_URL = 'https://api.open-meteo.com/v1/forecast';
 var OPEN_METEO_WEATHER_CACHE_KEY = storageKeys.OPEN_METEO_WEATHER_CACHE_KEY;
 var OPEN_METEO_CACHE_VERSION = 1;
 var OPEN_METEO_HOURLY = 'temperature_2m,apparent_temperature,precipitation_probability,uv_index';
-var OPEN_METEO_CURRENT = 'temperature_2m,apparent_temperature';
+var OPEN_METEO_CURRENT = 'temperature_2m,apparent_temperature,weather_code';
 
 /**
  * Count finite values in an array for diagnostics.
@@ -113,6 +114,7 @@ function buildOpenMeteoCache(openMeteoData, lat, lon, cityName, countryCode) {
         countryCode: countryCode,
         currentTemp: currentTemp,
         currentFeelsLike: currentFeelsLike,
+        condition: conditions.fromWmo(current ? current.weather_code : null),
         hourly: hourly
     };
 }

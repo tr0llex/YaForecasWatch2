@@ -42,7 +42,8 @@ static Config config_defaults(void) {
         .color_holiday_1 = GColorFolly,
         .color_holiday_2 = GColorVividCerulean,
         .face_theme = FACE_THEME_DARK,
-        .locale = LOCALE_AUTO
+        .locale = LOCALE_AUTO,
+        .weather_time = WEATHER_TIME_SUN_EVENT
     };
 }
 

@@ -6,7 +6,8 @@ enum key {
     CURRENT_TEMP, BATTERY_LEVEL, CONFIG, UV_TREND, DEBUG_FETCH_ERROR,
     HOLIDAY_SLOT1_YEAR0, HOLIDAY_SLOT1_YEAR1, HOLIDAY_SLOT1_YEAR2,
     HOLIDAY_SLOT2_YEAR0, HOLIDAY_SLOT2_YEAR1, HOLIDAY_SLOT2_YEAR2,
-    DEBUG_WEATHER_STATE, FEELS_LIKE_TREND, CURRENT_FEELS_LIKE
+    DEBUG_WEATHER_STATE, FEELS_LIKE_TREND, CURRENT_FEELS_LIKE, CONDITION,
+    WEATHER_UPDATED
 }; // Deprecated: BATTERY_LEVEL
 
 static int holiday_key(uint8_t slot, int16_t year) {
@@ -157,6 +158,14 @@ int persist_get_config(Config *config) {
     return persist_read_data(CONFIG, config, size);
 }
 
+int persist_get_condition() {
+    return persist_read_int(CONDITION);
+}
+
+time_t persist_get_weather_updated() {
+    return (time_t) persist_read_int(WEATHER_UPDATED);
+}
+
 bool persist_get_debug_fetch_error() {
     return persist_read_bool(DEBUG_FETCH_ERROR);
 }
@@ -238,6 +247,14 @@ void persist_set_sun_event_times(time_t *data, const size_t size) {
 void persist_set_config(Config config) {
     persist_write_data(CONFIG, &config, sizeof(Config));
     config_refresh();  // Refresh global config variable
+}
+
+void persist_set_condition(int val) {
+    persist_write_int(CONDITION, val);
+}
+
+void persist_set_weather_updated(time_t val) {
+    persist_write_int(WEATHER_UPDATED, (int32_t) val);
 }
 
 void persist_set_debug_fetch_error(bool val) {
