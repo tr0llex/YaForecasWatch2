@@ -58,6 +58,9 @@ static void draw_month_text(GContext *ctx, GRect bounds) {
 }
 
 static void draw_bitmap(GContext *ctx, GBitmap *bitmap, GRect frame) {
+    if (!bitmap) {
+        return;
+    }
     graphics_context_set_compositing_mode(ctx, GCompOpSet);
     graphics_draw_bitmap_in_rect(ctx, bitmap, frame);
     graphics_context_set_compositing_mode(ctx, GCompOpAssign);
@@ -66,6 +69,9 @@ static void draw_bitmap(GContext *ctx, GBitmap *bitmap, GRect frame) {
 static void ensure_mute_bitmap_loaded(void) {
     if (!s_mute_bitmap) {
         s_mute_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_MUTE);
+        if (!s_mute_bitmap) {
+            return;
+        }
         s_mute_palette[0] = GColorWhite;
         s_mute_palette[1] = GColorClear;
         gbitmap_set_palette(s_mute_bitmap, s_mute_palette, false);
@@ -75,6 +81,9 @@ static void ensure_mute_bitmap_loaded(void) {
 static void ensure_bt_bitmap_loaded(void) {
     if (!s_bt_bitmap) {
         s_bt_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BT_CONNECT);
+        if (!s_bt_bitmap) {
+            return;
+        }
         s_bt_palette[0] = PBL_IF_COLOR_ELSE(GColorPictonBlue, GColorWhite);
         s_bt_palette[1] = GColorClear;
         gbitmap_set_palette(s_bt_bitmap, s_bt_palette, false);
@@ -84,6 +93,9 @@ static void ensure_bt_bitmap_loaded(void) {
 static void ensure_bt_disconnect_bitmap_loaded(void) {
     if (!s_bt_disconnect_bitmap) {
         s_bt_disconnect_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BT_DISCONNECT);
+        if (!s_bt_disconnect_bitmap) {
+            return;
+        }
         s_bt_disconnect_palette[0] = PBL_IF_COLOR_ELSE(GColorRed, GColorWhite);
         s_bt_disconnect_palette[1] = GColorClear;
         gbitmap_set_palette(s_bt_disconnect_bitmap, s_bt_disconnect_palette, false);
@@ -170,12 +182,15 @@ void calendar_status_layer_create(Layer* parent_layer, GRect frame) {
 
 void bluetooth_icons_refresh(bool connected) {
     (void)connected;
+    if (!s_calendar_status_layer) {
+        return;
+    }
     layer_mark_dirty(s_calendar_status_layer);
 }
 
 void bluetooth_callback(bool connected) {
     bluetooth_icons_refresh(connected);
-    if (!connected && g_config->vibe)
+    if (!connected && g_config && g_config->vibe)
         vibes_double_pulse();
 }
 
@@ -184,6 +199,9 @@ bool show_qt_icon() {
 }
 
 void status_icons_refresh() {
+    if (!s_calendar_status_layer) {
+        return;
+    }
     layer_mark_dirty(s_calendar_status_layer);
 
     // Ensure bt icons are correct at start
@@ -198,6 +216,7 @@ void calendar_status_layer_refresh() {
 
 void calendar_status_layer_destroy() {
     MEMORY_LOG_HEAP("calendar_status_layer_destroy:before");
+    connection_service_unsubscribe();
     battery_layer_destroy();
     if (s_mute_bitmap) {
         gbitmap_destroy(s_mute_bitmap);
@@ -212,5 +231,6 @@ void calendar_status_layer_destroy() {
         s_bt_disconnect_bitmap = NULL;
     }
     layer_destroy(s_calendar_status_layer);
+    s_calendar_status_layer = NULL;
     MEMORY_LOG_HEAP("calendar_status_layer_destroy:after");
 }
