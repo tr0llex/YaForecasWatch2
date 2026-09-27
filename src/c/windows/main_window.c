@@ -110,7 +110,6 @@ static void minute_handler(struct tm *tick_time, TimeUnits units_changed) {
         calendar_status_layer_refresh();
     }
     status_icons_refresh();
-    loading_layer_refresh();
 }
 
 /*----------------------------
@@ -136,6 +135,9 @@ void main_window_create() {
 }
 
 void main_window_refresh() {
+    if (!s_main_window) {
+        return;
+    }
     time_layer_refresh();
     weather_status_layer_refresh();
     forecast_layer_refresh();
@@ -144,6 +146,9 @@ void main_window_refresh() {
 }
 
 void main_window_destroy() {
+    tick_timer_service_unsubscribe();
+
     // Interface for destroying the main window (implicitly unloads contents)
     window_destroy(s_main_window);
+    s_main_window = NULL;
 }

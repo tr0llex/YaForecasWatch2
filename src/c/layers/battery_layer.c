@@ -34,6 +34,9 @@ static GColor get_battery_color(int level) {
 static void ensure_battery_power_bitmap_loaded(void) {
     if (!s_battery_power_bitmap) {
         s_battery_power_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BATTERY_CHARGING);
+        if (!s_battery_power_bitmap) {
+            return;
+        }
         s_battery_palette[0] = GColorWhite;
         s_battery_palette[1] = GColorClear;
         gbitmap_set_palette(s_battery_power_bitmap, s_battery_palette, false);
@@ -90,7 +93,9 @@ static void battery_update_proc(Layer *layer, GContext *ctx) {
 
     if (show_power_icon) {
         ensure_battery_power_bitmap_loaded();
-        draw_power_icon(ctx, h, s_battery_power_bitmap);
+        if (s_battery_power_bitmap) {
+            draw_power_icon(ctx, h, s_battery_power_bitmap);
+        }
     }
 
     // Draw the white battery outline
@@ -125,6 +130,9 @@ void battery_layer_create(Layer* parent_layer, GRect frame) {
 }
 
 void battery_layer_refresh() {
+    if (!s_battery_layer) {
+        return;
+    }
     layer_mark_dirty(s_battery_layer);
 }
 
@@ -138,6 +146,9 @@ void battery_layer_destroy() {
         gbitmap_destroy(s_battery_power_bitmap);
         s_battery_power_bitmap = NULL;
     }
-    layer_destroy(s_battery_layer);
+    if (s_battery_layer) {
+        layer_destroy(s_battery_layer);
+        s_battery_layer = NULL;
+    }
     MEMORY_LOG_HEAP("battery_layer_destroy:after");
 }

@@ -223,13 +223,32 @@ function writeCache(key, source, year, dates) {
  * @param {number} year Calendar year.
  * @param {Function} onReady Callback with dates and metadata.
  * @param {Function=} debugLog Optional debug logger.
+ * @param {Function=} onRefreshed Called with fresh dates when a stale cache was
+ *     answered first.
  * @returns {void}
  */
-function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
+function loadHolidaySetYear(holidaySet, year, onReady, debugLog, onRefreshed) {
     var source = HOLIDAY_SOURCES[holidaySet];
     var key;
     var cached;
     var nowMs = Date.now();
+    var answered = false;
+
+    /**
+     * Report the dates at most once: sendHolidayBitsets() advances its queue
+     * from this callback.
+     *
+     * @param {string[]} dates Holiday dates.
+     * @param {Object} meta Load metadata.
+     * @returns {void}
+     */
+    function answer(dates, meta) {
+        if (answered) {
+            return;
+        }
+        answered = true;
+        onReady(dates, meta);
+    }
 
     if (!source) {
         if (typeof debugLog === 'function') {
@@ -238,7 +257,7 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
                 year: year
             });
         }
-        onReady([], { status: 'disabled' });
+        answer([], { status: 'disabled' });
         return;
     }
 
@@ -259,7 +278,13 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
                     dates: dates.length
                 });
             }
-            onReady(dates, { status: 'fresh', source: fresh.source });
+            if (answered) {
+                if (typeof onRefreshed === 'function') {
+                    onRefreshed(dates, { status: 'fresh', source: fresh.source });
+                }
+                return;
+            }
+            answer(dates, { status: 'fresh', source: fresh.source });
         }, function(error) {
             console.log('[holidays] refresh failed for ' + key + ': ' + JSON.stringify(error));
             if (typeof debugLog === 'function') {
@@ -272,9 +297,7 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
                     error: error
                 });
             }
-            if (!cached) {
-                onReady([], { status: 'failed_empty', error: error });
-            }
+            answer([], { status: 'failed_empty', error: error });
         }, debugLog);
     }
 
@@ -289,7 +312,7 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
                 fetchedAtUtc: cached.fetchedAtUtc
             });
         }
-        onReady(cached.dates, {
+        answer(cached.dates, {
             status: isStale(cached, nowMs) ? 'stale' : 'cached',
             source: cached.source
         });
@@ -383,6 +406,8 @@ function normalizeHolidaySet(value) {
 function sendHolidayBitsets(settings, onDone, debugLog) {
     var years = getHolidayYears();
     var jobs = [];
+    var running = false;
+    var done = false;
     var slots = [
         { slot: 1, holidaySet: normalizeHolidaySet(settings.holidaySet1) },
         { slot: 2, holidaySet: normalizeHolidaySet(settings.holidaySet2) }
@@ -405,62 +430,95 @@ function sendHolidayBitsets(settings, onDone, debugLog) {
         });
     });
 
-    function next() {
-        var job = jobs.shift();
+    /**
+     * Send one year to the watch, then continue with the queue.
+     *
+     * @param {Object} job Queue entry.
+     * @param {string[]} dates Holiday dates.
+     * @param {Object} meta Load metadata.
+     * @returns {void}
+     */
+    function send(job, dates, meta) {
+        var payload = {
+            HOLIDAY_SLOT: job.slot,
+            HOLIDAY_SET: job.holidaySet,
+            HOLIDAY_YEAR: job.year,
+            HOLIDAY_BITS: packHolidayBits(job.year, dates)
+        };
 
-        if (!job) {
+        Pebble.sendAppMessage(payload, function() {
+            console.log('[holidays] sent ' + JSON.stringify({
+                slot: job.slot,
+                holidaySet: job.holidaySet,
+                year: job.year,
+                dates: dates.length,
+                status: meta.status
+            }));
             if (typeof debugLog === 'function') {
-                debugLog('holiday_sync_complete', {});
-            }
-            if (typeof onDone === 'function') {
-                onDone();
-            }
-            return;
-        }
-
-        loadHolidaySetYear(job.holidaySet, job.year, function(dates, meta) {
-            var payload = {
-                HOLIDAY_SLOT: job.slot,
-                HOLIDAY_SET: job.holidaySet,
-                HOLIDAY_YEAR: job.year,
-                HOLIDAY_BITS: packHolidayBits(job.year, dates)
-            };
-
-            Pebble.sendAppMessage(payload, function() {
-                console.log('[holidays] sent ' + JSON.stringify({
+                debugLog('holiday_send_success', {
                     slot: job.slot,
                     holidaySet: job.holidaySet,
                     year: job.year,
                     dates: dates.length,
-                    status: meta.status
-                }));
+                    status: meta.status,
+                    source: meta.source || null
+                });
+            }
+            next();
+        }, function(error) {
+            console.log('[holidays] send failed: ' + JSON.stringify(error));
+            if (typeof debugLog === 'function') {
+                debugLog('holiday_send_failed', {
+                    slot: job.slot,
+                    holidaySet: job.holidaySet,
+                    year: job.year,
+                    dates: dates.length,
+                    status: meta.status,
+                    source: meta.source || null,
+                    error: error
+                });
+            }
+            next();
+        });
+    }
+
+    /**
+     * Send the next queued year, or finish when the queue is empty.
+     *
+     * @returns {void}
+     */
+    function next() {
+        var job = jobs.shift();
+
+        if (!job) {
+            running = false;
+            if (!done) {
+                done = true;
                 if (typeof debugLog === 'function') {
-                    debugLog('holiday_send_success', {
-                        slot: job.slot,
-                        holidaySet: job.holidaySet,
-                        year: job.year,
-                        dates: dates.length,
-                        status: meta.status,
-                        source: meta.source || null
-                    });
+                    debugLog('holiday_sync_complete', {});
                 }
-                next();
-            }, function(error) {
-                console.log('[holidays] send failed: ' + JSON.stringify(error));
-                if (typeof debugLog === 'function') {
-                    debugLog('holiday_send_failed', {
-                        slot: job.slot,
-                        holidaySet: job.holidaySet,
-                        year: job.year,
-                        dates: dates.length,
-                        status: meta.status,
-                        source: meta.source || null,
-                        error: error
-                    });
+                if (typeof onDone === 'function') {
+                    onDone();
                 }
+            }
+            return;
+        }
+
+        running = true;
+        if (job.dates) {
+            send(job, job.dates, job.meta);
+            return;
+        }
+
+        loadHolidaySetYear(job.holidaySet, job.year, function(dates, meta) {
+            send(job, dates, meta);
+        }, debugLog, function(dates, meta) {
+            // A stale cache was sent first; queue the refreshed year behind it.
+            jobs.push({ slot: job.slot, holidaySet: job.holidaySet, year: job.year, dates: dates, meta: meta });
+            if (!running) {
                 next();
-            });
-        }, debugLog);
+            }
+        });
     }
 
     next();
@@ -476,6 +534,7 @@ module.exports = {
     packHolidayBits: packHolidayBits,
     sendHolidayBitsets: sendHolidayBitsets,
     normalizeHolidaySet: normalizeHolidaySet,
+    _loadHolidaySetYear: loadHolidaySetYear,
     _cacheKey: cacheKey,
     _isStale: isStale
 };

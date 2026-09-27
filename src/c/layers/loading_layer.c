@@ -50,6 +50,9 @@ void loading_layer_create(Layer* parent_layer, GRect frame) {
 }
 
 void loading_layer_refresh() {
+    if (!s_loading_layer) {
+        return;
+    }
     if (loading_layer_has_cached_data())
         layer_set_hidden(s_loading_layer, true);
     else
@@ -60,5 +63,7 @@ void loading_layer_destroy() {
     MEMORY_LOG_HEAP("loading_layer_destroy:before");
     text_layer_destroy(s_loading_text_layer);
     layer_destroy(s_loading_layer);
+    s_loading_text_layer = NULL;
+    s_loading_layer = NULL;
     MEMORY_LOG_HEAP("loading_layer_destroy:after");
 }

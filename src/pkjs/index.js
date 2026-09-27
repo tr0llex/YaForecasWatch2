@@ -211,6 +211,7 @@ Pebble.addEventListener('ready',
             // that bundled the deterministic Chicago screenshot fixture.
             localStorage.removeItem(KEY_LAST_FETCH_SUCCESS);
             localStorage.setItem(KEY_UV_FIXTURE_CLEANUP, 'complete');
+            holidays.sendHolidayBitsets(app.settings, null, appendDebugWeatherLog);
             app.pendingStartupFetch = false;
             fetch(app.provider, true, false);
             startTick();
@@ -816,9 +817,15 @@ function maybeMonitorTravel() {
 
 function startTick() {
     console.log('Tick from PKJS!');
-    tryFetch(app.provider);
-    maybeMonitorTravel();
+    // Scheduled first so an exception below cannot end the loop.
     setTimeout(startTick, 60 * 1000); // 60 * 1000 milsec = 1 minute
+    try {
+        tryFetch(app.provider);
+        maybeMonitorTravel();
+    }
+    catch (ex) {
+        console.log('[!] Tick failed: ' + ex.message);
+    }
 }
 
 function sendClaySettings(onSuccess, onFailure) {
@@ -1586,6 +1593,11 @@ function needRefresh(provider) {
     // If the weather has never been fetched
     lastFetchSuccessTime = parseFetchStatusTime(localStorage.getItem(KEY_LAST_FETCH_SUCCESS));
     if (lastFetchSuccessTime === null) {
+        return true;
+    }
+
+    if (Date.now() < lastFetchSuccessTime) {
+        console.log('[!] Last fetch time is in the future; refreshing anyway');
         return true;
     }
 

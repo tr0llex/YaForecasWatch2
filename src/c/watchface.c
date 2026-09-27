@@ -17,8 +17,8 @@ static void init() {
 
 static void deinit() {
     MEMORY_LOG_HEAP("before_teardown");
-    config_unload();
     main_window_destroy();
+    config_unload();
     MEMORY_LOG_HEAP("after_teardown");
 }
 
