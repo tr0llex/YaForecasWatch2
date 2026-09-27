@@ -39,7 +39,10 @@ static Config config_defaults(void) {
         .holiday_set_1 = HOLIDAY_SET_US,
         .holiday_set_2 = HOLIDAY_SET_NONE,
         .color_holiday_1 = GColorFolly,
-        .color_holiday_2 = GColorVividCerulean
+        .color_holiday_2 = GColorVividCerulean,
+#ifndef PBL_PLATFORM_APLITE
+        .face_theme = FACE_THEME_DARK
+#endif
     };
 }
 

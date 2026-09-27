@@ -13,6 +13,33 @@ var config = [
     },
     {
         "type": "section",
+        "capabilities": ["NOT_PLATFORM_APLITE"],
+        "items": [
+            {
+                "type": "heading",
+                "defaultValue": "Face",
+            },
+            {
+                "type": "select",
+                "label": "Theme",
+                "messageKey": "faceTheme",
+                "defaultValue": "dark",
+                "capabilities": ["NOT_PLATFORM_APLITE"],
+                "options": [
+                    {
+                        "label": "Dark",
+                        "value": "dark"
+                    },
+                    {
+                        "label": "Light",
+                        "value": "light"
+                    }
+                ]
+            },
+        ]
+    },
+    {
+        "type": "section",
         "items": [
             {
                 "type": "heading",

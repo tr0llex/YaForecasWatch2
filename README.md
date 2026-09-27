@@ -57,6 +57,7 @@ Open source revival of the beloved ForecasWatch watchface. This includes support
 * Fahrenheit and Celsius temperatures
 * Customize time font and color
 * Customize colors for Sundays, Saturdays, and up to two holiday sets
+* Dark and light themes (not on aplite)
 * Offline configuration page
 
 *\* Using a hacky workaround*

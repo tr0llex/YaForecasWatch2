@@ -17,6 +17,12 @@ If you need runtime logs, `mise install-emulator --logs` runs it in an emulator 
 - If a UI element only exists to paint pixels, keep it as light as possible instead of modeling it as a full layer.
 - Avoid floating-point math and 64-bit division in watch-side C, prefer integer multiply-before-divide so linked software math helper code doesn't consume heap. See #163.
 
+## Face Conventions
+
+- Colors go through `theme_bg()`, `theme_fg()`, `theme_pick()` and `theme_readable()` (`theme.h`); the dark theme keeps the original colors. On aplite the helpers are constants and `THEME_IS_FIXED` is 1, so refresh paths that re-apply colors are skipped there.
+- Band rectangles come from `face_layout_compute()` (`face_layout.h`).
+- Append new `Config` fields and `messageKeys` at the end, and read new Clay tuples as optional in `app_message.c`. Options aplite leaves out go in the `#ifndef PBL_PLATFORM_APLITE` block of `Config` and are hidden in the settings page with `NOT_PLATFORM_APLITE`. Run `pebble clean` after adding a message key.
+
 ## Code Conventions
 
 - For new JavaScript functions, add brief JSDoc (`@param`/`@returns`) annotations since this project does not use TypeScript.

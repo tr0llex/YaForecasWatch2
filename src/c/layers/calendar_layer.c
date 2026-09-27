@@ -1,4 +1,5 @@
 #include "calendar_layer.h"
+#include "c/appendix/theme.h"
 #include "c/appendix/config.h"
 #include "c/appendix/memory_log.h"
 #include "c/appendix/persist.h"
@@ -174,14 +175,19 @@ static HolidayMatch holiday_match(struct tm *t) {
 }
 
 #ifdef PBL_COLOR
+// A configured white means "no highlight" and follows the theme.
+static GColor calendar_color(GColor configured) {
+    return gcolor_equal(configured, GColorWhite) ? theme_fg() : theme_readable(configured);
+}
+
 static GColor holiday_color(HolidayMatch match) {
     if (match.slot_1) {
-        return g_config->color_holiday_1;
+        return calendar_color(g_config->color_holiday_1);
     }
     if (match.slot_2) {
-        return g_config->color_holiday_2;
+        return calendar_color(g_config->color_holiday_2);
     }
-    return GColorWhite;
+    return theme_fg();
 }
 
 static GRect holiday_highlight_rect(GRect cell_rect) {
@@ -204,7 +210,8 @@ static void fill_split_rect(GContext *ctx, GRect rect, GColor left_color, GColor
 
 static void draw_holiday_highlight(GContext *ctx, GRect rect, HolidayMatch match) {
     if (match.slot_1 && match.slot_2) {
-        fill_split_rect(ctx, rect, g_config->color_holiday_1, g_config->color_holiday_2);
+        fill_split_rect(ctx, rect, calendar_color(g_config->color_holiday_1),
+                        calendar_color(g_config->color_holiday_2));
         return;
     }
 
@@ -217,10 +224,10 @@ static void draw_holiday_highlight(GContext *ctx, GRect rect, HolidayMatch match
 static GColor date_color(struct tm *t) {
     // Get color for a date, considering weekends and holidays
     if (t->tm_wday == 0)
-        return g_config->color_sunday;
+        return calendar_color(g_config->color_sunday);
     if (t->tm_wday == 6)
-        return g_config->color_saturday;
-    return GColorWhite;
+        return calendar_color(g_config->color_saturday);
+    return theme_fg();
 }
 #endif
 
@@ -231,9 +238,9 @@ static GColor today_color() {
     HolidayMatch match = holiday_match(&t);
     return gcolor_equal(g_config->color_today, GColorBlack) && (match.slot_1 || match.slot_2)
         ? holiday_color(match)
-        : (gcolor_equal(g_config->color_today, GColorBlack) ? date_color(&t) : g_config->color_today);
+        : (gcolor_equal(g_config->color_today, GColorBlack) ? date_color(&t) : calendar_color(g_config->color_today));
 #else
-    return GColorWhite;
+    return theme_fg();
 #endif
 }
 
@@ -259,7 +266,8 @@ static void calendar_update_proc(Layer *layer, GContext *ctx) {
     HolidayMatch today_holiday = holiday_match(&tm_today);
 
     if (gcolor_equal(g_config->color_today, GColorBlack) && today_holiday.slot_1 && today_holiday.slot_2) {
-        fill_split_rect(ctx, today_rect, g_config->color_holiday_1, g_config->color_holiday_2);
+        fill_split_rect(ctx, today_rect, calendar_color(g_config->color_holiday_1),
+                        calendar_color(g_config->color_holiday_2));
     }
     else {
         graphics_context_set_fill_color(ctx, today_color());
@@ -281,7 +289,7 @@ static void calendar_update_proc(Layer *layer, GContext *ctx) {
         GColor text_color = (i == i_today) ? gcolor_legible_over(today_color())
                                            : (highlight_holiday ? gcolor_legible_over(holiday_color(match)) : date_color(&t));
 #else
-        GColor text_color = (i == i_today) ? GColorBlack : GColorWhite;
+        GColor text_color = (i == i_today) ? theme_bg() : theme_fg();
 #endif
         char buffer[4];
         GFont font = fonts_get_system_font(bold ? CALENDAR_FONT_KEY_BOLD : CALENDAR_FONT_KEY);

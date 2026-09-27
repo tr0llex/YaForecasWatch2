@@ -8,6 +8,11 @@ enum TimeFont {
     TIME_FONT_BITHAM = 2,
 };
 
+enum FaceTheme {
+    FACE_THEME_DARK = 0,
+    FACE_THEME_LIGHT = 1,
+};
+
 enum HolidaySet {
     HOLIDAY_SET_NONE = 0,
     HOLIDAY_SET_US = 1,
@@ -40,6 +45,10 @@ typedef struct {
     GColor color_holiday_2;
     bool show_feels_like;
     GColor color_feels_like;
+    // Append only: older stored configs keep defaults for newer fields.
+#ifndef PBL_PLATFORM_APLITE
+    uint8_t face_theme;
+#endif
 } Config;
 
 extern Config *g_config;

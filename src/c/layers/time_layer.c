@@ -1,4 +1,5 @@
 #include "time_layer.h"
+#include "c/appendix/theme.h"
 #include "c/appendix/config.h"
 #include "c/appendix/memory_log.h"
 #include "c/appendix/persist.h"
@@ -19,11 +20,18 @@ static TextLayer *s_error_layer;
 static GColor debug_time_color() {
     switch (persist_get_debug_weather_state()) {
         case DEBUG_WEATHER_STATE_STALE_CACHE:
-            return PBL_IF_COLOR_ELSE(GColorRed, GColorWhite);
+            return PBL_IF_COLOR_ELSE(theme_readable(GColorRed), theme_fg());
         case DEBUG_WEATHER_STATE_OPENMETEO_TEMP:
-            return PBL_IF_COLOR_ELSE(GColorYellow, GColorWhite);
+            return PBL_IF_COLOR_ELSE(theme_readable(GColorYellow), theme_fg());
         default:
-            return PBL_IF_COLOR_ELSE(g_config->color_time, GColorWhite);
+#ifdef PBL_COLOR
+            if (gcolor_equal(g_config->color_time, GColorWhite)) {
+                return theme_fg();
+            }
+            return theme_readable(g_config->color_time);
+#else
+            return theme_fg();
+#endif
     }
 }
 
@@ -43,13 +51,13 @@ void time_layer_create(Layer* parent_layer, GRect frame) {
     // AM/PM formatting
     text_layer_set_font(s_am_pm_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
     text_layer_set_background_color(s_am_pm_layer, GColorClear);
-    text_layer_set_text_color(s_am_pm_layer, GColorWhite);
+    text_layer_set_text_color(s_am_pm_layer, theme_fg());
     text_layer_set_text(s_am_pm_layer, "PM");
     text_layer_set_text_alignment(s_am_pm_layer, GTextAlignmentLeft);
 
     text_layer_set_font(s_error_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
     text_layer_set_background_color(s_error_layer, GColorClear);
-    text_layer_set_text_color(s_error_layer, PBL_IF_COLOR_ELSE(GColorRed, GColorWhite));
+    text_layer_set_text_color(s_error_layer, PBL_IF_COLOR_ELSE(theme_readable(GColorRed), theme_fg()));
     text_layer_set_text(s_error_layer, "!");
     text_layer_set_text_alignment(s_error_layer, GTextAlignmentCenter);
 
@@ -134,6 +142,10 @@ void time_layer_tick() {
 void time_layer_refresh() {
     text_layer_set_font(s_time_layer, config_time_font());
     text_layer_set_text_color(s_time_layer, debug_time_color());
+    if (!THEME_IS_FIXED) {
+        text_layer_set_text_color(s_am_pm_layer, theme_fg());
+        text_layer_set_text_color(s_error_layer, PBL_IF_COLOR_ELSE(theme_readable(GColorRed), theme_fg()));
+    }
     time_layer_tick();  // Update main time text and layer positions
 }
 

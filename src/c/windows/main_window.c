@@ -6,6 +6,7 @@
 #include "c/layers/calendar_layer.h"
 #include "c/layers/calendar_status_layer.h"
 #include "c/layers/loading_layer.h"
+#include "c/appendix/theme.h"
 #include "c/appendix/app_message.h"
 #include "c/appendix/persist.h"
 #include "c/appendix/memory_log.h"
@@ -15,7 +16,7 @@ static Window *s_main_window;
 static void main_window_load(Window *window) {
     // Get information about the Window
     Layer *window_layer = window_get_root_layer(window);
-    window_set_background_color(window, GColorBlack);
+    window_set_background_color(window, theme_bg());
 
     // The face is fullscreen, so the display size is the window size; as a
     // compile-time constant it lets the layout fold into fixed rectangles.
@@ -84,11 +85,15 @@ void main_window_refresh() {
     if (!s_main_window) {
         return;
     }
+    if (!THEME_IS_FIXED) {
+        window_set_background_color(s_main_window, theme_bg());
+    }
     time_layer_refresh();
     weather_status_layer_refresh();
     forecast_layer_refresh();
     calendar_layer_refresh();
     calendar_status_layer_refresh();
+    loading_layer_refresh();
 }
 
 void main_window_destroy() {
