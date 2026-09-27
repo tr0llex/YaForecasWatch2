@@ -139,6 +139,64 @@ module.exports = function (minified) {
         }
     }
 
+    // Tells index.js to reopen the page after saving ("Apply").
+    var KEEP_OPEN_KEY = '_keepConfigOpen';
+
+    var LIGHT_THEME_CSS = [
+        'body { background: #ececed !important; color: #1c1c1e !important; }',
+        '.section { background: #ffffff !important; box-shadow: #d9d9de 0 0.15rem 0.25rem !important; }',
+        '.label { color: #1c1c1e !important; }',
+        '.section .component-heading {',
+        '  background: #e4e4e8 !important; color: #1c1c1e !important;',
+        '  border-bottom: 1px solid #d9d9de !important;',
+        '}',
+        '.section .component-heading * { color: #1c1c1e !important; }',
+        '.description, .component-text, .component-footer { color: #5f6368 !important; }',
+        '.component-input .input input, .component-select .value,',
+        '.component-slider .value, input, select, textarea {',
+        '  background: #f4f4f6 !important; color: #1c1c1e !important;',
+        '  border: 1px solid #c7c7cc !important;',
+        '}',
+        '.component-color .picker-wrap .picker {',
+        '  background: #ffffff !important;',
+        '  box-shadow: 0 0.17647rem 0.88235rem rgba(0, 0, 0, 0.25) !important;',
+        '}',
+        '.button { color: #ffffff !important; }',
+        '.api-key-reveal {',
+        '  background: #e9e9ee !important; color: #1c1c1e !important;',
+        '  border-left: 1px solid #c7c7cc !important;',
+        '}',
+        'a { color: #0a62c2 !important; }'
+    ].join(' ');
+
+    /**
+     * Apply or remove the light page stylesheet.
+     *
+     * @param {string} theme 'light' or 'dark'.
+     * @returns {void}
+     */
+    function applyPageTheme(theme) {
+        var styleId = 'settings-page-theme';
+        var existing = document.getElementById(styleId);
+        var style;
+
+        if (theme !== 'light') {
+            if (existing && existing.parentNode) {
+                existing.parentNode.removeChild(existing);
+            }
+            return;
+        }
+        if (existing) {
+            return;
+        }
+
+        style = document.createElement('style');
+        style.id = styleId;
+        style.type = 'text/css';
+        style.appendChild(document.createTextNode(LIGHT_THEME_CSS));
+        document.head.appendChild(style);
+    }
+
     clayConfig.on(clayConfig.EVENTS.AFTER_BUILD, function() {
         var clayFetch;
         var clayOwmApiKey;
@@ -160,6 +218,7 @@ module.exports = function (minified) {
         var attemptText;
         var shouldShowLastAttempt;
         var debugWeatherLog;
+        var pageTheme;
 
         clayFetch = clayConfig.getItemByMessageKey('fetch');
         clayFetch.set(false);
@@ -242,9 +301,17 @@ module.exports = function (minified) {
             });
         }
 
-        // Override submit handler to force re-fetch if provider config changed
-        $('#main-form').on('submit', function() {
+        /**
+         * Hand the settings back to the phone.
+         *
+         * @param {boolean} keepOpen Reopen the page after saving.
+         * @returns {void}
+         */
+        function submitConfig(keepOpen) {
             var returnTo;
+            var payload;
+
+            // Force a re-fetch if the provider config changed
             if (clayProvider.get() !== initProvider
                 || clayOwmApiKey.get() !== initOwmApiKey
                 || clayYandexApiKey.get() !== initYandexApiKey
@@ -252,10 +319,54 @@ module.exports = function (minified) {
                 clayFetch.set(true);
             }
 
+            payload = clayConfig.serialize();
+            if (keepOpen) {
+                payload[KEEP_OPEN_KEY] = { value: true };
+            }
+
             // Copied from original handler ($.off requires non-anonymous handler)
             returnTo = window.returnTo || 'pebblejs://close#';
-            location.href = returnTo +
-                encodeURIComponent(JSON.stringify(clayConfig.serialize()));
-        })
+            location.href = returnTo + encodeURIComponent(JSON.stringify(payload));
+        }
+
+        /**
+         * Add an "Apply" button that saves and keeps the page open.
+         *
+         * @returns {void}
+         */
+        function addApplyButton() {
+            var form = document.getElementById('main-form');
+            var submitButton = form ? form.querySelector('[type="submit"]') : null;
+            var apply;
+
+            if (!submitButton || document.getElementById('apply-settings')) {
+                return;
+            }
+
+            apply = document.createElement('button');
+            apply.id = 'apply-settings';
+            apply.type = 'button';
+            apply.className = submitButton.className;
+            apply.textContent = t('apply', 'Apply');
+            apply.style.marginBottom = '0.5rem';
+            apply.addEventListener('click', function(event) {
+                event.preventDefault();
+                submitConfig(true);
+            });
+            submitButton.parentNode.insertBefore(apply, submitButton);
+        }
+
+        $('#main-form').on('submit', function() {
+            submitConfig(false);
+        });
+        addApplyButton();
+
+        pageTheme = clayConfig.getItemByMessageKey('configTheme');
+        if (pageTheme) {
+            applyPageTheme(pageTheme.get());
+            pageTheme.on('change', function() {
+                applyPageTheme(this.get());
+            });
+        }
     });
 };

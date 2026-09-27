@@ -140,7 +140,53 @@ Pebble.addEventListener('appmessage', function(e) {
     }
 });
 
+var KEEP_OPEN_KEY = '_keepConfigOpen';
+
+/**
+ * Split a settings page payload into its keep-open flag and the settings.
+ *
+ * @param {string} response Raw payload from the webviewclosed event.
+ * @returns {{keepOpen: boolean, response: string}} Flag and payload without it.
+ */
+function extractKeepOpen(response) {
+    var parsed;
+    var flag;
+
+    if (typeof response !== 'string') {
+        return { keepOpen: false, response: response };
+    }
+
+    try {
+        parsed = JSON.parse(response.match(/^\{/) ? response : decodeURIComponent(response));
+    }
+    catch (ex) {
+        return { keepOpen: false, response: response };
+    }
+
+    if (!parsed || typeof parsed !== 'object'
+        || !Object.prototype.hasOwnProperty.call(parsed, KEEP_OPEN_KEY)) {
+        return { keepOpen: false, response: response };
+    }
+
+    flag = parsed[KEEP_OPEN_KEY];
+    delete parsed[KEEP_OPEN_KEY];
+    return {
+        keepOpen: Boolean(flag && typeof flag === 'object' ? flag.value : flag),
+        response: JSON.stringify(parsed)
+    };
+}
+
 Pebble.addEventListener('showConfiguration', function(e) {
+    openConfigPage();
+    console.log('Showing clay: ' + JSON.stringify(getClaySettings()));
+});
+
+/**
+ * Open the settings page, translated and with current fetch status.
+ *
+ * @returns {void}
+ */
+function openConfigPage() {
     var language = getSettingsLanguage();
 
     clay.config = clayI18n.localizeConfig(clayConfig, language);
@@ -150,15 +196,16 @@ Pebble.addEventListener('showConfiguration', function(e) {
     clay.meta.userData.lastFetchAttempt = localStorage.getItem(KEY_LAST_FETCH_ATTEMPT);
     clay.meta.userData.debugWeatherLog = localStorage.getItem(KEY_DEBUG_WEATHER_LOG);
     Pebble.openURL(clay.generateUrl());
-    console.log('Showing clay: ' + JSON.stringify(getClaySettings()));
-});
+}
 
 Pebble.addEventListener('webviewclosed', function(e) {
     if (e && !e.response) {
         return;
     }
 
-    clay.getSettings(e.response, false);  // This triggers the update in localStorage
+    var applied = extractKeepOpen(e.response);
+
+    clay.getSettings(applied.response, false);  // This triggers the update in localStorage
     app.settings = getClaySettings();  // This reads from localStorage in sensible format
     app.telemetry = createTelemetryClient(getRuntimeTelemetryConfig());
     refreshProvider();
@@ -171,6 +218,10 @@ Pebble.addEventListener('webviewclosed', function(e) {
         fetch(app.provider, true, true);
     }
     console.log('Closing clay: ' + JSON.stringify(getClaySettings()));
+
+    if (applied.keepOpen) {
+        openConfigPage();
+    }
 });
 
 // Listen for when the watchface is opened
@@ -871,6 +922,7 @@ function sendClaySettings(onSuccess, onFailure) {
         "CLAY_LOCALE": ['auto', 'en', 'ru'].indexOf(app.settings.locale) > 0
             ? ['auto', 'en', 'ru'].indexOf(app.settings.locale)
             : 0,
+        "CLAY_CALENDAR_WEEKS": String(app.settings.calendarWeeks) === '2' ? 2 : 3,
         "CLAY_TIME_FONT": ['roboto', 'leco', 'bitham'].indexOf(app.settings.timeFont),
         "CLAY_SHOW_QT": app.settings.showQt,
         "CLAY_SHOW_BT": app.settings.btIcons === "connected" || app.settings.btIcons === "both",
@@ -1028,6 +1080,8 @@ function getDefaultClaySettings() {
         faceTheme: 'dark',
         locale: 'auto',
         weatherTime: 'sun',
+        configTheme: 'dark',
+        calendarWeeks: '3',
         colorToday: 0,
         colorSunday: DEFAULT_COLOR_FOLLY,
         colorSaturday: DEFAULT_COLOR_FOLLY,

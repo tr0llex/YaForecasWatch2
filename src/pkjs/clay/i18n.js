@@ -29,6 +29,7 @@ var TRANSLATIONS = {
                 label: 'Первый день недели',
                 options: { sun: 'Воскресенье', mon: 'Понедельник' }
             },
+            calendarWeeks: { label: 'Сколько недель показывать' },
             firstWeek: {
                 label: 'Первая неделя',
                 options: { prev: 'Прошлая', curr: 'Текущая' }
@@ -106,6 +107,10 @@ var TRANSLATIONS = {
                 placeholder: 'По GPS'
             },
             showQt: { label: 'Значок «Не беспокоить»' },
+            configTheme: {
+                label: 'Тема страницы настроек',
+                options: { dark: 'Тёмная', light: 'Светлая' }
+            },
             vibe: { label: 'Вибрация при потере Bluetooth' },
             btIcons: {
                 label: 'Значок Bluetooth',
@@ -136,7 +141,8 @@ var TRANSLATIONS = {
             via: ', источник: ',
             lastFailedAttempt: 'Последняя неудачная попытка:',
             error: 'Ошибка: ',
-            noDebugLog: 'Пока пусто.'
+            noDebugLog: 'Пока пусто.',
+            apply: 'Применить'
         }
     }
 };

@@ -43,7 +43,8 @@ static Config config_defaults(void) {
         .color_holiday_2 = GColorVividCerulean,
         .face_theme = FACE_THEME_DARK,
         .locale = LOCALE_AUTO,
-        .weather_time = WEATHER_TIME_SUN_EVENT
+        .weather_time = WEATHER_TIME_SUN_EVENT,
+        .calendar_weeks = 3
     };
 }
 
@@ -113,6 +114,11 @@ int config_n_today() {
     if (g_config->prev_week)
         wday += 7;
     return wday;
+}
+
+int config_calendar_weeks() {
+    const int weeks = g_config->calendar_weeks;
+    return weeks == 2 ? 2 : 3;
 }
 
 GFont config_time_font() {

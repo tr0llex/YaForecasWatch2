@@ -61,6 +61,7 @@ typedef struct {
     uint8_t face_theme;
     uint8_t locale;
     uint8_t weather_time;
+    uint8_t calendar_weeks;
 } Config;
 
 extern Config *g_config;
@@ -78,6 +79,8 @@ int config_format_time(char *s, size_t maxsize, const struct tm * tm_p);
 int config_axis_hour(int hour);
 
 int config_n_today();
+
+int config_calendar_weeks();
 
 GFont config_time_font();
 

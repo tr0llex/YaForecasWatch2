@@ -59,6 +59,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     Tuple *clay_face_theme_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_FACE_THEME);
     Tuple *clay_locale_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_LOCALE);
     Tuple *clay_weather_time_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_WEATHER_TIME);
+    Tuple *clay_calendar_weeks_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_CALENDAR_WEEKS);
 
     if(temp_trend_tuple && precip_trend_tuple && uv_trend_tuple && forecast_start_tuple && num_entries_tuple
         && current_temp_tuple && city_tuple && sun_events_tuple) {
@@ -187,6 +188,12 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
             && clay_weather_time_tuple->value->int32 == WEATHER_TIME_UPDATED
             ? WEATHER_TIME_UPDATED
             : WEATHER_TIME_SUN_EVENT;
+        uint8_t calendar_weeks = clay_calendar_weeks_tuple
+            ? (uint8_t)clay_calendar_weeks_tuple->value->int32
+            : 3;
+        if (calendar_weeks != 2) {
+            calendar_weeks = 3;
+        }
         Config config = (Config) {
             .celsius = clay_celsius,
             .time_lead_zero = time_lead_zero,
@@ -213,7 +220,8 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
             .color_holiday_2 = color_holiday_2,
             .face_theme = face_theme,
             .locale = locale,
-            .weather_time = weather_time
+            .weather_time = weather_time,
+            .calendar_weeks = calendar_weeks
         };
         persist_set_config(config);
         main_window_refresh();

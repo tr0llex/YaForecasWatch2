@@ -111,6 +111,7 @@
       "CLAY_FACE_THEME",
       "CLAY_LOCALE",
       "CLAY_WEATHER_TIME",
+      "CLAY_CALENDAR_WEEKS",
       "CLAY_TIME_FONT",
       "CLAY_SHOW_QT",
       "CLAY_SHOW_BT",

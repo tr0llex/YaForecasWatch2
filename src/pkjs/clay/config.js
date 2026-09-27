@@ -146,6 +146,22 @@ var config = [
             },
             {
                 "type": "select",
+                "label": "Weeks to display",
+                "messageKey": "calendarWeeks",
+                "defaultValue": "3",
+                "options": [
+                    {
+                        "label": "2",
+                        "value": "2"
+                    },
+                    {
+                        "label": "3",
+                        "value": "3"
+                    }
+                ]
+            },
+            {
+                "type": "select",
                 "label": "First week to display",
                 "messageKey": "firstWeek",
                 "defaultValue": "prev",
@@ -435,6 +451,22 @@ var config = [
                     {
                         "label": "None",
                         "value": "none"
+                    }
+                ]
+            },
+            {
+                "type": "select",
+                "label": "Settings page theme",
+                "messageKey": "configTheme",
+                "defaultValue": "dark",
+                "options": [
+                    {
+                        "label": "Dark",
+                        "value": "dark"
+                    },
+                    {
+                        "label": "Light",
+                        "value": "light"
                     }
                 ]
             },

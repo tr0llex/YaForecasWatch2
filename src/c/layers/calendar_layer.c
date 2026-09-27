@@ -6,9 +6,10 @@
 #include "c/services/watch_services.h"
 #include <time.h>
 
-#define NUM_WEEKS 3
+#define NUM_WEEKS (config_calendar_weeks())
 #define DAYS_PER_WEEK 7
 #define FONT_OFFSET 5
+#define FONT_OFFSET_ROW_H 15
 #define EMERY_CALENDAR_TEXT_SHIFT_Y 5
 #define EMERY_CALENDAR_TEXT_SHIFT_X 1
 
@@ -61,8 +62,9 @@ static GRect calendar_text_rect(GRect cell_rect, const char *text, GFont font) {
 static GRect calendar_text_rect(GRect cell_rect, const char *text, GFont font) {
     (void)text;
     (void)font;
+    const int center_shift = (cell_rect.size.h - FONT_OFFSET_ROW_H) / 2;
     return GRect(cell_rect.origin.x,
-                 cell_rect.origin.y - FONT_OFFSET,
+                 cell_rect.origin.y - FONT_OFFSET + center_shift,
                  cell_rect.size.w,
                  cell_rect.size.h + FONT_OFFSET);
 }
