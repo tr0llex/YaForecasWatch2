@@ -204,6 +204,9 @@ void weather_status_layer_create(Layer* parent_layer, GRect frame) {
 }
 
 void weather_status_layer_refresh() {
+    if (!s_weather_status_layer) {
+        return;
+    }
     layer_mark_dirty(s_weather_status_layer);
     current_temp_layer_refresh();
     sun_event_layer_refresh();
@@ -212,6 +215,9 @@ void weather_status_layer_refresh() {
 }
 
 void weather_status_layer_destroy() {
+    if (!s_weather_status_layer) {
+        return;
+    }
     MEMORY_LOG_HEAP("weather_status_layer_destroy:before");
     text_layer_destroy(s_city_layer);
     text_layer_destroy(s_current_temp_layer);
@@ -221,5 +227,9 @@ void weather_status_layer_destroy() {
         s_arrow_path = NULL;
     }
     layer_destroy(s_weather_status_layer);
+    s_city_layer = NULL;
+    s_current_temp_layer = NULL;
+    s_next_sun_event_layer = NULL;
+    s_weather_status_layer = NULL;
     MEMORY_LOG_HEAP("weather_status_layer_destroy:after");
 }
