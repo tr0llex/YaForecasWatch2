@@ -183,9 +183,10 @@ function coordinateDistanceKm(lat1, lon1, lat2, lon2) {
  *
  * @param {number|string} lat Current latitude.
  * @param {number|string} lon Current longitude.
+ * @param {string} language Language the label must be in, e.g. 'EN'.
  * @returns {{cityName: string, countryCode: string|null, fetchedAtUtc: string}|null} Cached label.
  */
-function readReverseGeocodeCache(lat, lon) {
+function readReverseGeocodeCache(lat, lon, language) {
     var cached = readStoredJson(REVERSE_GEOCODE_CACHE_KEY);
     var currentLat = finiteCoordinate(lat);
     var currentLon = finiteCoordinate(lon);
@@ -195,6 +196,10 @@ function readReverseGeocodeCache(lat, lon) {
     if (!cached || currentLat === null || currentLon === null
         || cachedLat === null || cachedLon === null
         || typeof cached.cityName !== 'string' || cached.cityName.length === 0) {
+        return null;
+    }
+
+    if ((cached.lang || 'EN') !== language) {
         return null;
     }
 
@@ -217,14 +222,16 @@ function readReverseGeocodeCache(lat, lon) {
  * @param {number|string} lon Longitude.
  * @param {string} cityName Place label.
  * @param {string|null} countryCode Country code.
+ * @param {string} language Language of the label, e.g. 'EN'.
  * @returns {void}
  */
-function writeReverseGeocodeCache(lat, lon, cityName, countryCode) {
+function writeReverseGeocodeCache(lat, lon, cityName, countryCode, language) {
     localStorage.setItem(REVERSE_GEOCODE_CACHE_KEY, JSON.stringify({
         lat: finiteCoordinate(lat),
         lon: finiteCoordinate(lon),
         cityName: cityName,
         countryCode: countryCode,
+        lang: language,
         fetchedAtUtc: new Date().toISOString()
     }));
 }
@@ -251,6 +258,7 @@ function writeGeocodeBackoff() {
 
 var WeatherProvider = function() {
     this.numEntries = 24;
+    this.geocodeLanguage = 'EN';
     this.name = 'Template';
     this.id = 'interface';
     this.location = null; // Address query used for overriding the GPS
@@ -352,10 +360,11 @@ WeatherProvider.prototype.withSunEvents = function(lat, lon, callback, onFailure
 WeatherProvider.prototype.withCityName = function(lat, lon, callback) {
     // callback(cityName, countryCode)
     var provider = this;
-    var url = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?f=json&langCode=EN&location='
-        + lon + ',' + lat;
+    var language = provider.geocodeLanguage || 'EN';
+    var url = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?f=json&langCode='
+        + language + '&location=' + lon + ',' + lat;
     var handleFailure = function(error) {
-        var cached = readReverseGeocodeCache(lat, lon);
+        var cached = readReverseGeocodeCache(lat, lon, language);
 
         console.log('[!] Reverse geocode failed: ' + JSON.stringify(error));
         provider.warnings.push(failure('reverse_geocode', error.code));
@@ -397,7 +406,7 @@ WeatherProvider.prototype.withCityName = function(lat, lon, callback) {
             address = body.address || {};
             name = address.District || address.City || address.Region || 'Unknown';
             countryCode = address.CountryCode || null;
-            writeReverseGeocodeCache(lat, lon, name, countryCode);
+            writeReverseGeocodeCache(lat, lon, name, countryCode, language);
             provider.diagnostics.reverseGeocode = {
                 status: 'success'
             };

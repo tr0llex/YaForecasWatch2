@@ -3,6 +3,7 @@
 #include "appendix/app_message.h"
 #include "appendix/persist.h"
 #include "appendix/config.h"
+#include "appendix/ui_fonts.h"
 #include "appendix/memory_log.h"
 
 
@@ -18,6 +19,7 @@ static void init() {
 static void deinit() {
     MEMORY_LOG_HEAP("before_teardown");
     main_window_destroy();
+    ui_fonts_unload();
     config_unload();
     MEMORY_LOG_HEAP("after_teardown");
 }

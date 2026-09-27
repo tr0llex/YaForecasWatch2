@@ -1,5 +1,7 @@
 #include "calendar_status_layer.h"
 #include "battery_layer.h"
+#include "c/appendix/ui_fonts.h"
+#include "c/appendix/i18n.h"
 #include "c/appendix/theme.h"
 #include "c/appendix/config.h"
 #include "c/appendix/memory_log.h"
@@ -16,16 +18,18 @@
 #define STATUS_ICON_Y(bounds_h, icon_h) (((bounds_h) - (icon_h)) / 2)
 #define BATTERY_Y(bounds_h) (((bounds_h) - BATTERY_H) / 2)
 #define MONTH_FONT_KEY FONT_KEY_GOTHIC_24
+#define MONTH_TEXT_SIZE UI_TEXT_LARGE
 #define STATUS_ROW_H 20
 #else
 #define STATUS_ICON_Y(bounds_h, icon_h) ((void)(bounds_h), (void)(icon_h), 0)
 #define BATTERY_Y(bounds_h) ((void)(bounds_h), 1)
 #define MONTH_FONT_KEY FONT_KEY_GOTHIC_18
+#define MONTH_TEXT_SIZE UI_TEXT_MEDIUM
 #define STATUS_ROW_H 13
 #endif
 
 static Layer *s_calendar_status_layer;
-static char s_calendar_month_text[10];
+static char s_calendar_month_text[24];
 static GBitmap *s_mute_bitmap;
 static GBitmap *s_bt_bitmap;
 static GBitmap *s_bt_disconnect_bitmap;
@@ -48,13 +52,18 @@ static GRect month_text_rect(GRect bounds, GFont font) {
 }
 
 static void draw_month_text(GContext *ctx, GRect bounds) {
-    const GFont month_font = fonts_get_system_font(MONTH_FONT_KEY);
+    const GFont system_font = fonts_get_system_font(MONTH_FONT_KEY);
+    const GFont month_font = ui_font_for_text(s_calendar_month_text, system_font, MONTH_TEXT_SIZE);
+    GRect rect = month_text_rect(bounds, month_font);
+    if (month_font != system_font) {
+        rect.origin.y += ui_font_text_offset_y(MONTH_TEXT_SIZE);
+    }
     graphics_context_set_text_color(ctx, theme_fg());
     graphics_draw_text(
         ctx,
         s_calendar_month_text,
         month_font,
-        month_text_rect(bounds, month_font),
+        rect,
         GTextOverflowModeFill,
         GTextAlignmentCenter,
         NULL);
@@ -218,7 +227,8 @@ void status_icons_refresh() {
 
 void calendar_status_layer_refresh() {
     struct tm tm_now = watch_services_localtime();
-    strftime(s_calendar_month_text, sizeof(s_calendar_month_text), "%b %Y", &tm_now);
+    snprintf(s_calendar_month_text, sizeof(s_calendar_month_text), "%s %d",
+             i18n_month_short(tm_now.tm_mon), tm_now.tm_year + 1900);
     status_icons_refresh();
 }
 

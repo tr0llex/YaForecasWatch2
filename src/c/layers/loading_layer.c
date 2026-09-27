@@ -1,4 +1,6 @@
 #include "loading_layer.h"
+#include "c/appendix/ui_fonts.h"
+#include "c/appendix/i18n.h"
 #include "c/appendix/theme.h"
 #include "c/appendix/persist.h"
 #include "c/appendix/memory_log.h"
@@ -40,9 +42,7 @@ void loading_layer_create(Layer* parent_layer, GRect frame) {
     s_loading_text_layer = text_layer_create(GRect(0, h / 3, w, h));
     text_layer_set_background_color(s_loading_text_layer, GColorClear);
     text_layer_set_text_color(s_loading_text_layer, theme_fg());
-    text_layer_set_font(s_loading_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
     text_layer_set_text_alignment(s_loading_text_layer, GTextAlignmentCenter);
-    text_layer_set_text(s_loading_text_layer, "No data :(");
 
     layer_set_update_proc(s_loading_layer, loading_update_proc);
     layer_add_child(s_loading_layer, text_layer_get_layer(s_loading_text_layer));
@@ -55,6 +55,10 @@ void loading_layer_refresh() {
         return;
     }
     text_layer_set_text_color(s_loading_text_layer, theme_fg());
+    const char *text = i18n_no_data();
+    text_layer_set_font(s_loading_text_layer,
+            ui_font_for_text(text, fonts_get_system_font(FONT_KEY_GOTHIC_18), UI_TEXT_MEDIUM));
+    text_layer_set_text(s_loading_text_layer, text);
     if (loading_layer_has_cached_data())
         layer_set_hidden(s_loading_layer, true);
     else

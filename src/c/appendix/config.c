@@ -1,6 +1,7 @@
 #include "config.h"
 #include "persist.h"
 #include "math.h"
+#include "i18n.h"
 #include "memory_log.h"
 #include "c/services/watch_services.h"
 
@@ -40,13 +41,18 @@ static Config config_defaults(void) {
         .holiday_set_2 = HOLIDAY_SET_NONE,
         .color_holiday_1 = GColorFolly,
         .color_holiday_2 = GColorVividCerulean,
-        .face_theme = FACE_THEME_DARK
+        .face_theme = FACE_THEME_DARK,
+        .locale = LOCALE_AUTO
     };
 }
 
 static void config_read_or_default(Config *config) {
     *config = config_defaults();
-    persist_get_config(config);
+    if (persist_get_config(config) <= 0 && i18n_system_is_ru()) {
+        config->celsius = true;
+        config->start_mon = true;
+        config->holiday_set_1 = HOLIDAY_SET_RU;
+    }
 }
 
 void config_load() {

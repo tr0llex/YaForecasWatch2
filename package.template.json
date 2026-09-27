@@ -62,6 +62,25 @@
           "name": "IMAGE_BATTERY_CHARGING",
           "file": "img/battery-charging.png",
           "memoryFormat": "1BitPalette"
+        },
+        {
+          "type": "font",
+          "name": "FONT_TEXT_13",
+          "file": "fonts/Roboto-Regular.ttf",
+          "characterRegex": "[ -~°•ЁА-яё–—«»]"
+        },
+        {
+          "type": "font",
+          "name": "FONT_TEXT_15",
+          "file": "fonts/Roboto-Regular.ttf",
+          "characterRegex": "[ -~°•ЁА-яё–—«»]"
+        },
+        {
+          "type": "font",
+          "name": "FONT_TEXT_20",
+          "file": "fonts/Roboto-Regular.ttf",
+          "characterRegex": "[ -~°•ЁА-яё–—«»]",
+          "targetPlatforms": ["emery"]
         }
       ]
     },
@@ -89,6 +108,7 @@
       "CLAY_COLOR_TODAY",
       "CLAY_PREV_WEEK",
       "CLAY_FACE_THEME",
+      "CLAY_LOCALE",
       "CLAY_TIME_FONT",
       "CLAY_SHOW_QT",
       "CLAY_SHOW_BT",
