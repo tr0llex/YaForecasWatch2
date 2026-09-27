@@ -39,8 +39,8 @@ void persist_init() {
         persist_write_data(FEELS_LIKE_TREND, (void*) data, 12*sizeof(int16_t));
     }
     if (!persist_exists(PRECIP_TREND)) {
-        uint8_t data[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-        persist_write_data(PRECIP_TREND, (void*) data, 12*sizeof(uint8_t));
+        uint8_t data[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        persist_write_data(PRECIP_TREND, (void*) data, sizeof(data));
     }
     if (!persist_exists(UV_TREND)) {
         uint8_t data[] = {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255};

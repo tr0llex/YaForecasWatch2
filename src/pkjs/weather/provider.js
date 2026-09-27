@@ -307,7 +307,8 @@ WeatherProvider.prototype.withSunEvents = function(lat, lon, callback, onFailure
      * where each sun event contains a 'type' ('sunrise' or 'sunset') and a 'date' (of type Date)
      */
     var dateNow = new Date();
-    var dateTomorrow = new Date().setDate(dateNow.getDate() + 1);
+    var dateTomorrow = new Date(dateNow.getTime());
+    dateTomorrow.setDate(dateTomorrow.getDate() + 1);
 
     var resultsToday;
     var resultsTomorrow;

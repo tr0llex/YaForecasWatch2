@@ -1,4 +1,5 @@
 #include "weather_status_layer.h"
+#include <string.h>
 #include "c/appendix/persist.h"
 #include "c/appendix/config.h"
 #include "c/appendix/memory_log.h"
@@ -52,10 +53,42 @@ static void text_layer_move_frame(TextLayer *text_layer, GRect frame) {
     layer_set_frame(text_layer_get_layer(text_layer), frame);
 }
 
+// persist_read_string() may cut a multi-byte character in half.
+static void trim_partial_utf8(char *text) {
+    int i = (int)strlen(text) - 1;
+    int continuation = 0;
+
+    while (i >= 0 && ((unsigned char)text[i] & 0xC0) == 0x80) {
+        continuation += 1;
+        i -= 1;
+    }
+    if (i < 0) {
+        return;
+    }
+
+    const unsigned char lead = (unsigned char)text[i];
+    int expected = 0;
+    if ((lead & 0xE0) == 0xC0) {
+        expected = 1;
+    }
+    else if ((lead & 0xF0) == 0xE0) {
+        expected = 2;
+    }
+    else if ((lead & 0xF8) == 0xF0) {
+        expected = 3;
+    }
+
+    if (continuation < expected) {
+        text[i] = '\0';
+    }
+}
+
 static void city_layer_refresh() {
     // Set the city text layer contents from storage
-    static char s_city_buffer[20];
+    static char s_city_buffer[48];
     persist_get_city(s_city_buffer, sizeof(s_city_buffer));
+    s_city_buffer[sizeof(s_city_buffer) - 1] = '\0';
+    trim_partial_utf8(s_city_buffer);
     text_layer_set_text(s_city_layer, s_city_buffer);
 
     // Dynamic resizing
