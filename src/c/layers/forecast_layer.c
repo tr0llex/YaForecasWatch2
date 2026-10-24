@@ -40,7 +40,6 @@
 #define DAY_SECONDS (24 * 60 * 60)
 #define UV_INDEX_MAX 11
 #define UV_INDEX_UNAVAILABLE 255
-#define FEELS_LIKE_UNAVAILABLE (-32767 - 1)
 #define FEELS_LIKE_DOT_RADIUS PBL_IF_COLOR_ELSE(2, 1)
 
 typedef struct
@@ -559,7 +558,6 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
     int16_t feels_like_temps[MAX_FORECAST_ENTRIES];
     uint8_t precips[MAX_FORECAST_ENTRIES] = {0};
     uint8_t uv_indices[MAX_FORECAST_ENTRIES];
-    memset(feels_like_temps, FEELS_LIKE_UNAVAILABLE, sizeof(feels_like_temps));
     memset(uv_indices, UV_INDEX_UNAVAILABLE, sizeof(uv_indices));
     persist_get_temp_trend(temps, stored_num_entries);
     persist_get_feels_like_trend(feels_like_temps, stored_num_entries);
@@ -842,7 +840,6 @@ static void text_labels_refresh()
     }
 
     memset(temps, 0, sizeof(temps));
-    memset(feels_like_temps, FEELS_LIKE_UNAVAILABLE, sizeof(feels_like_temps));
     if (stored_num_entries >= 2)
     {
         data_offset = forecast_visible_offset(persist_get_forecast_start(), stored_num_entries);
