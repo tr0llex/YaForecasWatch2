@@ -102,7 +102,15 @@ function readWeatherCache(key, version) {
  * @returns {void}
  */
 function writeWeatherCache(key, cache) {
-    localStorage.setItem(key, JSON.stringify(cache));
+    /* Самая объёмная запись в localStorage: 24 часа прогноза. Если хранилище
+     * переполнено, исключение отсюда обрывало уже удавшийся запрос — погода не
+     * доезжала до часов из-за неудавшегося кеша. Кеш не критичен, а погода да. */
+    try {
+        localStorage.setItem(key, JSON.stringify(cache));
+    }
+    catch (ex) {
+        console.log('[!] Cannot cache forecast under ' + key + ': ' + ex.message);
+    }
 }
 
 /**

@@ -7,7 +7,6 @@
 #define FONT_14_OFFSET 3
 #define CITY_INIT_WIDTH 100
 #define MARGIN 2
-#define FEELS_LIKE_UNAVAILABLE (-32767 - 1)
 
 // emery: use larger text and arrow geometry
 #ifdef PBL_PLATFORM_EMERY
