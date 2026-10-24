@@ -62,6 +62,84 @@
           "name": "IMAGE_BATTERY_CHARGING",
           "file": "img/battery-charging.png",
           "memoryFormat": "1BitPalette"
+        },
+        {
+          "type": "font",
+          "name": "FONT_UI_BOLD_24",
+          "file": "fonts/Roboto-Bold.ttf",
+          "characterRegex": "[0-9A-Za-zА-Яа-яЁё :.,°%+/()-]"
+        },
+        {
+          "type": "font",
+          "name": "FONT_UI_20",
+          "file": "fonts/Roboto-Regular.ttf",
+          "characterRegex": "[0-9A-Za-zА-Яа-яЁё :.,°%+/()-]"
+        },
+        {
+          "type": "font",
+          "name": "FONT_AXIS_12",
+          "file": "fonts/Roboto-Regular.ttf",
+          "characterRegex": "[0-9°-]"
+        },
+        {
+          "type": "font",
+          "name": "FONT_UI_12",
+          "file": "fonts/Roboto-Regular.ttf",
+          "characterRegex": "[0-9A-Za-zА-Яа-яЁё :.,°%+/()-]"
+        },
+        {
+          "type": "font",
+          "name": "FONT_CAL_22",
+          "file": "fonts/Roboto-Regular.ttf",
+          "characterRegex": "[0-9]"
+        },
+        {
+          "type": "font",
+          "name": "FONT_CAL_BOLD_22",
+          "file": "fonts/Roboto-Bold.ttf",
+          "characterRegex": "[0-9]"
+        },
+        {
+          "type": "font",
+          "name": "FONT_UI_BOLD_16",
+          "file": "fonts/Roboto-Bold.ttf",
+          "characterRegex": "[0-9A-Za-zА-Яа-яЁё :.,°%+/()-]"
+        },
+        {
+          "type": "font",
+          "name": "FONT_CAL_18",
+          "file": "fonts/Roboto-Regular.ttf",
+          "characterRegex": "[0-9]"
+        },
+        {
+          "type": "font",
+          "name": "FONT_CAL_BOLD_18",
+          "file": "fonts/Roboto-Bold.ttf",
+          "characterRegex": "[0-9]"
+        },
+        {
+          "type": "font",
+          "name": "FONT_UI_BOLD_20",
+          "file": "fonts/Roboto-Bold.ttf",
+          "characterRegex": "[0-9A-Za-zА-Яа-яЁё :.,°%+/()-]"
+        },
+        {
+          "type": "font",
+          "name": "FONT_CLOCK_79",
+          "file": "fonts/RobotoCondensed-Bold.ttf",
+          "characterRegex": "[0-9:]"
+        },
+        {
+          "type": "font",
+          "name": "FONT_CLOCK_76",
+          "file": "fonts/RobotoCondensed-Bold.ttf",
+          "characterRegex": "[0-9:]"
+        },
+        {
+          "type": "font",
+          "name": "FONT_CLOCK_58",
+          "file": "fonts/RobotoCondensed-Bold.ttf",
+          "characterRegex": "[0-9:]"
         }
       ]
     },
