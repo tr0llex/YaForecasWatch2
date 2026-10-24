@@ -220,6 +220,9 @@ function populateProviderFromCache(provider, cache, windowTimes, sourceName) {
     provider.startTime = windowTimes[0];
     provider.currentTemp = fallbackTemp;
     provider.currentFeelsLike = finiteNumber(cache.currentFeelsLike);
+    /* Тип погоды живёт в том же кеше, что и температуры: провайдеру не нужно
+     * помнить его отдельно, а при подъёме из кеша он не теряется. */
+    provider.condition = typeof cache.condition === 'number' ? cache.condition : 0;
     provider.tempTrend = [];
     provider.feelsLikeTrend = [];
     provider.precipTrend = [];

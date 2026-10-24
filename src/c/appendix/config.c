@@ -1,4 +1,5 @@
 #include "config.h"
+#include "ui_fonts.h"
 #include "persist.h"
 #include "math.h"
 #include "memory_log.h"
@@ -16,11 +17,15 @@ static Config s_config;
 // The C standard doesn't allow these in static variable initializers, so we use a
 // function instead. See: https://gcc.gnu.org/onlinedocs/gcc/Compound-Literals.html
 static Config config_defaults(void) {
+    /* Значения до первого сообщения с телефона. Раньше здесь стояли
+     * американские: часы без связи показывали Фаренгейт, американские
+     * праздники и неделю с воскресенья. Держим их такими же, как значения по
+     * умолчанию на странице настроек (src/pkjs/index.js). */
     return (Config) {
-        .celsius = false,
+        .celsius = true,
         .time_lead_zero = false,
         .axis_12h = false,
-        .start_mon = false,
+        .start_mon = true,
         .prev_week = true,
         .show_qt = true,
         .show_bt = true,
@@ -36,10 +41,12 @@ static Config config_defaults(void) {
         .color_time = GColorWhite,
         .color_feels_like = GColorYellow,
         .day_night_shading = true,
-        .holiday_set_1 = HOLIDAY_SET_US,
+        .holiday_set_1 = HOLIDAY_SET_RU,
         .holiday_set_2 = HOLIDAY_SET_NONE,
         .color_holiday_1 = GColorFolly,
-        .color_holiday_2 = GColorVividCerulean
+        .color_holiday_2 = GColorVividCerulean,
+        .calendar_weeks = 2,
+        .face_theme = FACE_THEME_DARK
     };
 }
 
@@ -107,7 +114,29 @@ int config_n_today() {
     return wday;
 }
 
+int config_calendar_weeks() {
+    const int weeks = g_config->calendar_weeks;
+    /* Zero means "written by a build that predates this option". */
+    if (weeks != 2 && weeks != 3) return 2;
+    return weeks;
+}
+
 GFont config_time_font() {
+#ifdef PBL_PLATFORM_EMERY
+    /* Roboto — собственный ресурс, его размер подбирается под высоту полосы;
+     * Leco и Bitham берём системные. Раньше здесь всегда возвращался Roboto,
+     * и настройка «Шрифт часов» на emery просто ничего не делала. */
+    if (g_config->time_font == TIME_FONT_LECO) {
+        return fonts_get_system_font(FONT_KEY_LECO_60_NUMBERS_AM_PM);
+    }
+    if (g_config->time_font == TIME_FONT_BITHAM) {
+        return fonts_get_system_font(FONT_KEY_BITHAM_42_MEDIUM_NUMBERS);
+    }
+    /* Сюда на emery не приходят: time_layer сам берёт начертание по высоте
+     * полосы (ui_font_clock_for_height) и зовёт config_time_font() только
+     * для Leco и Bitham. Оставлен системный шрифт как безопасный ответ. */
+    return fonts_get_system_font(FONT_KEY_ROBOTO_BOLD_SUBSET_49);
+#else
     const char *font_keys[] = {
         [TIME_FONT_ROBOTO] = FONT_KEY_ROBOTO_BOLD_SUBSET_49,
 #ifdef PBL_PLATFORM_EMERY
@@ -123,6 +152,7 @@ GFont config_time_font() {
     if (font_index < 0 || font_index >= font_count)
         font_index = TIME_FONT_ROBOTO;
     return fonts_get_system_font(font_keys[font_index]);
+#endif
 }
 
 bool config_highlight_holidays() {

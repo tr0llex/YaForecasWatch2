@@ -20,12 +20,18 @@
     "colorSaturday": "GColorFolly",
     "colorSunday": "GColorFolly",
     "holidaySet1": "2",
-    "holidaySet2": "4",
+    "holidaySet2": "0",
     "colorHoliday1": "GColorFolly",
-    "colorHoliday2": "GColorVividCerulean"
+    "colorHoliday2": "GColorVividCerulean",
+    "temperatureUnits": "c",
+    "weekStartDay": "mon",
+    "location": "Moscow",
+    "calendarWeeks": "2",
+    "faceTheme": "dark",
+    "timeFont": "roboto"
   },
   "weather": {
-    "city": "Moscow",
+    "city": "Москва",
     "currentTemp": 54,
     "startHour": 12,
     "temps": [

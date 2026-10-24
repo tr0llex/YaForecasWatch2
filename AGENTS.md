@@ -26,3 +26,28 @@ If you need runtime logs, `mise install-emulator --logs` runs it in an emulator 
 ## Supabase migrations
 
 Never write `migrations/` files manually. Edit declarative `schemas/` and generate migrations as-needed before commits with `supabase db diff -f <label>`
+
+## Russian production calendar
+
+Working weekends are transmitted separately in `HOLIDAY_WORKING_BITS`.
+Keep new message keys appended to `package.template.json` so existing IDs
+remain stable. When changing `HolidayYear`, preserve migration from the
+previous persisted layout. Run `node scripts/test-holidays.js` and
+`mise build release` after calendar changes.
+
+## Emery pages
+
+The overview, calendar and forecast pages use the existing singleton layers.
+Destroy outgoing content before creating the next page; refresh callbacks must
+be safe while their layer is absent. Pages change only by explicit horizontal
+swipes: never subscribe to accelerometer taps for navigation, since ordinary
+wrist motion can trigger them. Touch subscriptions pause while a system popup
+has focus. Respect `TouchEvent.non_navigational` so an unarmed
+contact cannot change pages. Keep the overview forecast band at its full 62px
+height down to the bottom edge. The face has no Health strip or subscriptions
+and does not request the health capability. Bluetooth and battery colours
+affect screen icons only, never the backlight.
+
+Missing feels-like forecasts must invalidate the previous optional series.
+`persist_get_feels_like_trend` fills unread or incomplete entries with
+`FEELS_LIKE_UNAVAILABLE`; never byte-fill an int16 array with this sentinel.

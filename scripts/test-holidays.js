@@ -10,6 +10,16 @@ global.XMLHttpRequest = function XMLHttpRequest() {};
 
 const assert = require('assert');
 const holidays = require('../src/pkjs/holidays.js');
+const ruCalendar = require('../src/pkjs/ru-production-calendar.js');
+
+assert.strictEqual(ruCalendar.isProvisional(2027), false);
+assert.deepStrictEqual(ruCalendar.workingDatesForYear(2027), ['2027-02-20']);
+assert.strictEqual(ruCalendar.datesForYear(2027).includes('2027-02-20'), false);
+assert.strictEqual(ruCalendar.datesForYear(2027).includes('2027-02-22'), true);
+const workingBits = holidays.packHolidayBits(2027, ruCalendar.workingDatesForYear(2027));
+// 20 February is day 50 (zero-based); neighbouring days are not working overrides.
+assert.strictEqual(workingBits[6], 1 << 2);
+assert.strictEqual(workingBits.reduce((sum, value) => sum + value, 0), 1 << 2);
 
 const sampleSpain = [
   { date: '2026-01-01', global: true, counties: null, types: ['Public'] },

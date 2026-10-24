@@ -1,7 +1,7 @@
 {
-  "name": "yaforecaswatch2",
-  "author": "Dmitry Kvasnikov",
-  "version": "1.34.14",
+  "name": "pogodnik",
+  "author": "Alexey Samoylov",
+  "version": "2.2.2",
   "buildProfile": "{{buildProfile}}",
   "keywords": [
     "pebble-app"
@@ -13,7 +13,7 @@
   },
   "private": true,
   "dependencies": {
-    "suncalc": "^1.9.0"
+    "suncalc": "^2.0.2"
   },
   "pebble": {
     "displayName": "{{displayName}}",
@@ -156,6 +156,7 @@
       "NUM_ENTRIES",
       "CURRENT_TEMP",
       "CURRENT_FEELS_LIKE",
+      "CONDITION",
       "CITY",
       "SUN_EVENTS",
       "WATCH_HAS_FORECAST_DATA",
@@ -166,6 +167,8 @@
       "CLAY_START_MON",
       "CLAY_COLOR_TODAY",
       "CLAY_PREV_WEEK",
+      "CLAY_CALENDAR_WEEKS",
+      "CLAY_FACE_THEME",
       "CLAY_TIME_FONT",
       "CLAY_SHOW_QT",
       "CLAY_SHOW_BT",
@@ -187,7 +190,8 @@
       "HOLIDAY_SET",
       "HOLIDAY_YEAR",
       "HOLIDAY_BITS",
-      "DEBUG_WEATHER_STATE"
+      "DEBUG_WEATHER_STATE",
+      "HOLIDAY_WORKING_BITS"
     ]
   }
 }

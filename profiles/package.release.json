@@ -1,6 +1,6 @@
 {
-  "displayName": "YaForecasWatch2",
-  "uuid": "764a2743-4e0b-4ba8-aabb-18359ecbe422",
+  "displayName": "Погодник",
+  "uuid": "7c1f2a90-5d63-4e88-9a41-2b6c8e30d517",
   "buildProfile": "release",
   "menuIcon": "icon.png"
 }

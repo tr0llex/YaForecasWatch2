@@ -6,7 +6,7 @@ enum key {
     CURRENT_TEMP, BATTERY_LEVEL, CONFIG, UV_TREND, DEBUG_FETCH_ERROR,
     HOLIDAY_SLOT1_YEAR0, HOLIDAY_SLOT1_YEAR1, HOLIDAY_SLOT1_YEAR2,
     HOLIDAY_SLOT2_YEAR0, HOLIDAY_SLOT2_YEAR1, HOLIDAY_SLOT2_YEAR2,
-    DEBUG_WEATHER_STATE, FEELS_LIKE_TREND, CURRENT_FEELS_LIKE
+    DEBUG_WEATHER_STATE, FEELS_LIKE_TREND, CURRENT_FEELS_LIKE, WEATHER_UPDATED, CONDITION
 }; // Deprecated: BATTERY_LEVEL
 
 static int holiday_key(uint8_t slot, int16_t year) {
@@ -145,6 +145,14 @@ int persist_get_city(char *buffer, const size_t buffer_size) {
     return persist_read_string(CITY, buffer, buffer_size);
 }
 
+int persist_get_condition() {
+    return persist_read_int(CONDITION);
+}
+
+time_t persist_get_weather_updated() {
+    return (time_t) persist_read_int(WEATHER_UPDATED);
+}
+
 int persist_get_sun_event_start_type() {
     return persist_read_int(SUN_EVENT_START_TYPE);
 }
@@ -186,7 +194,23 @@ bool persist_get_holiday_year(uint8_t slot, int16_t year, HolidayYear *holiday_y
         return false;
     }
 
-    if (persist_get_size(key) != (int)sizeof(HolidayYear)) {
+    // Older releases stored only holidays. Keep those while the phone is offline.
+    typedef struct {
+        int16_t year;
+        uint8_t holiday_set;
+        uint8_t bits[HOLIDAY_BITSET_BYTES];
+    } LegacyHolidayYear;
+    const int stored_size = persist_get_size(key);
+    if (stored_size == (int)sizeof(LegacyHolidayYear)) {
+        LegacyHolidayYear old;
+        if (persist_read_data(key, &old, sizeof(old)) != (int)sizeof(old)) {
+            return false;
+        }
+        *holiday_year = (HolidayYear){ .year = old.year, .holiday_set = old.holiday_set };
+        memcpy(holiday_year->bits, old.bits, sizeof(old.bits));
+        return holiday_year->year == year;
+    }
+    if (stored_size != (int)sizeof(HolidayYear)) {
         return false;
     }
 
@@ -243,6 +267,14 @@ void persist_set_current_feels_like(int val) {
 
 void persist_set_city(char *val) {
     persist_write_string(CITY, val);
+}
+
+void persist_set_condition(int val) {
+    persist_write_int(CONDITION, val);
+}
+
+void persist_set_weather_updated(time_t val) {
+    persist_write_int(WEATHER_UPDATED, (int32_t) val);
 }
 
 void persist_set_sun_event_start_type(int val) {
