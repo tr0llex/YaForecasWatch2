@@ -25,15 +25,6 @@
 #endif
 
 static Window *s_main_window;
-#ifdef PBL_PLATFORM_EMERY
-// emery: overview, calendar and forecast share the existing layer implementations.
-static uint8_t s_page;
-static bool s_input_active;
-static bool s_touch_down;
-static GPoint s_touch_start;
-static void change_page(int delta);
-#endif
-
 static void content_create(Window *window) {
     // Get information about the Window
     Layer *window_layer = window_get_root_layer(window);
@@ -44,28 +35,14 @@ static void content_create(Window *window) {
 
 #ifdef PBL_PLATFORM_EMERY
     EmeryLayout l = emery_layout_compute(bounds);
-    if (s_page == 1) {
-        l.calendar = GRect(0, 20, w, h - 20 - 60);
-        l.clock = GRect(0, h - 60, w, 60);
-    } else if (s_page == 2) {
-        l.clock = GRect(0, 20, w, 50);
-        l.weather = GRect(0, 70, w, 26);
-        l.forecast = GRect(0, 96, w, h - 96);
-    }
-
-    // emery: create only the content visible on the selected page.
-    if (s_page != 1) {
-        forecast_layer_create(window_layer, l.forecast);
-        weather_status_layer_create(window_layer, l.weather);
-    }
+    // emery: one permanent layout; gestures must never hide calendar or weather.
+    forecast_layer_create(window_layer, l.forecast);
+    weather_status_layer_create(window_layer, l.weather);
     time_layer_create(window_layer, l.clock);
-    calendar_layer_set_grid(s_page == 1 ? 4 : 0, 1);
-    if (s_page != 2) calendar_layer_create(window_layer, l.calendar);
+    calendar_layer_create(window_layer, l.calendar);
     calendar_status_layer_create(window_layer, l.status);
-    if (s_page != 1) {
-        loading_layer_create(window_layer,
-                GRect(0, l.weather.origin.y, w, l.weather.size.h + l.forecast.size.h));
-    }
+    loading_layer_create(window_layer,
+            GRect(0, l.weather.origin.y, w, l.weather.size.h + l.forecast.size.h));
 #else
     forecast_layer_create(window_layer,
             GRect(0, h - FORECAST_HEIGHT, w, FORECAST_HEIGHT));
@@ -101,60 +78,12 @@ static void content_destroy(Window *window) {
     MEMORY_LOG_HEAP("after_window_unload");
 }
 
-#ifdef PBL_PLATFORM_EMERY
-// emery: only an explicit horizontal swipe changes pages, never wrist motion.
-static void change_page(int delta) {
-    if (!s_main_window || !s_input_active) return;
-    s_page = (s_page + 3 + delta) % 3;
-    content_destroy(s_main_window);
-    content_create(s_main_window);
-    time_layer_refresh();
-}
-
-static void touch_handler(const TouchEvent *event, void *context) {
-    if (!s_input_active || event->non_navigational) {
-        s_touch_down = false;
-        return;
-    }
-    if (event->type == TouchEvent_Touchdown) {
-        s_touch_start = GPoint(event->x, event->y);
-        s_touch_down = true;
-    } else if (event->type == TouchEvent_Liftoff && s_touch_down) {
-        s_touch_down = false;
-        const int dx = event->x - s_touch_start.x;
-        const int dy = event->y - s_touch_start.y;
-        if (abs(dx) >= 30 && abs(dx) > abs(dy)) change_page(dx < 0 ? 1 : -1);
-    }
-}
-
-static void focus_handler(bool focused) {
-    s_touch_down = false;
-    if (focused == s_input_active) return;
-    s_input_active = focused;
-    if (focused) {
-        touch_service_subscribe(touch_handler, NULL);
-    } else {
-        touch_service_unsubscribe();
-    }
-}
-#endif
-
 static void main_window_load(Window *window) {
     content_create(window);
     app_message_send_startup_state(!loading_layer_needs_refresh());
-#ifdef PBL_PLATFORM_EMERY
-    // emery: keep the original single-page layout on platforms without touch.
-    app_focus_service_subscribe(focus_handler);
-    focus_handler(true);
-#endif
 }
 
 static void main_window_unload(Window *window) {
-#ifdef PBL_PLATFORM_EMERY
-    // emery: unsubscribe before destroying the layers used by callbacks.
-    focus_handler(false);
-    app_focus_service_unsubscribe();
-#endif
     content_destroy(window);
 }
 

@@ -10,8 +10,8 @@
 // emery: the row count is a user setting (two or three weeks), so the grid is
 // laid out at runtime. Other platforms keep the fixed three-row grid.
 #ifdef PBL_PLATFORM_EMERY
-#define NUM_WEEKS (calendar_grid_weeks())
-#define MAX_WEEKS 6
+#define NUM_WEEKS (config_calendar_weeks())
+#define MAX_WEEKS 3
 #else
 #define NUM_WEEKS 3
 #define MAX_WEEKS 3
@@ -33,32 +33,7 @@
 #endif
 
 static Layer *s_calendar_layer;
-#ifdef PBL_PLATFORM_EMERY
-static int s_grid_weeks;
-static int s_rows_before_today;
-/** Row count for the grid, from the user setting. */
-static int calendar_grid_weeks(void) {
-    return s_grid_weeks ? s_grid_weeks : config_calendar_weeks();
-}
-#endif
 
-void calendar_layer_set_grid(int weeks, int rows_before_today) {
-#ifdef PBL_PLATFORM_EMERY
-    // emery: the expanded page has its own grid without changing saved settings.
-    s_grid_weeks = weeks > 0 && weeks <= MAX_WEEKS ? weeks : 0;
-    s_rows_before_today = rows_before_today >= 0 && rows_before_today < s_grid_weeks
-        ? rows_before_today : 0;
-#endif
-    calendar_layer_refresh();
-}
-
-/** Index of today's cell. */
-static int calendar_index_of_today(void) {
-#ifdef PBL_PLATFORM_EMERY
-    if (s_grid_weeks) return config_n_today() % DAYS_PER_WEEK + s_rows_before_today * DAYS_PER_WEEK;
-#endif
-    return config_n_today();
-}
 
 typedef struct {
     bool slot_1;
@@ -324,7 +299,7 @@ static void calendar_update_proc(Layer *layer, GContext *ctx) {
     const int box_h = h / NUM_WEEKS;
 
     // Calculate which box holds today's date
-    const int i_today = calendar_index_of_today();
+    const int i_today = config_n_today();
 
     GRect today_rect = calendar_cell_rect(bounds, i_today);
     (void) box_w;

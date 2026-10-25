@@ -35,18 +35,16 @@ remain stable. When changing `HolidayYear`, preserve migration from the
 previous persisted layout. Run `node scripts/test-holidays.js` and
 `mise build release` after calendar changes.
 
-## Emery pages
+## Emery layout
 
-The overview, calendar and forecast pages use the existing singleton layers.
-Destroy outgoing content before creating the next page; refresh callbacks must
-be safe while their layer is absent. Pages change only by explicit horizontal
-swipes: never subscribe to accelerometer taps for navigation, since ordinary
-wrist motion can trigger them. Touch subscriptions pause while a system popup
-has focus. Respect `TouchEvent.non_navigational` so an unarmed
-contact cannot change pages. Keep the overview forecast band at its full 62px
-height down to the bottom edge. The face has no Health strip or subscriptions
-and does not request the health capability. Bluetooth and battery colours
-affect screen icons only, never the backlight.
+Keep one permanent overview: date/status, calendar, clock, weather and the
+bottom 62px forecast band. Never add touch, accelerometer or focus callbacks
+that switch layouts or hide the calendar/weather. A screen-sized calendar or
+forecast is not a supported state, even after an intentional gesture.
+Background refreshes must reuse the layers; only window lifecycle creates or
+destroys them. Respect the configured two/three calendar rows in the fixed band.
+The face has no Health strip/subscriptions/capability. Bluetooth and battery
+colours affect screen icons only, never the backlight.
 
 Missing feels-like forecasts must invalidate the previous optional series.
 `persist_get_feels_like_trend` fills unread or incomplete entries with
