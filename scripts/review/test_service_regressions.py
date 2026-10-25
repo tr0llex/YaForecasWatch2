@@ -33,5 +33,3 @@ def run_c(code):
         source.write_text(code)
         subprocess.run(["cc", "-std=c11", str(source), "-o", str(binary)], check=True)
         subprocess.run([str(binary)], check=True)
-
-
