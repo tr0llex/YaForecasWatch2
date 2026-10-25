@@ -4,6 +4,7 @@ var CACHE_VERSION = 'v1';
 var CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 var BITSET_BYTES = 46;
 var NAGER_BASE_URL = 'https://date.nager.at/api/v3/PublicHolidays/';
+var ruCalendar = require('./ru-production-calendar.js');
 
 var HOLIDAY_SET_NONE = 0;
 var HOLIDAY_SET_US = 1;
@@ -238,12 +239,48 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
                 year: year
             });
         }
-        onReady([], { status: 'disabled' });
+        answer([], { status: 'disabled' });
         return;
+    }
+
+    if (holidaySet === HOLIDAY_SET_RU) {
+        // The Russian production calendar includes day-off transfers that
+        // Nager.Date does not publish, so built-in data wins where we have it.
+        var builtIn = ruCalendar.datesForYear(year);
+        if (builtIn) {
+            if (typeof debugLog === 'function') {
+                debugLog('holiday_builtin_ru', {
+                    year: year,
+                    dates: builtIn.length,
+                    provisional: ruCalendar.isProvisional(year)
+                });
+            }
+            answer(builtIn, {
+                status: 'builtin',
+                provisional: ruCalendar.isProvisional(year)
+            });
+            return;
+        }
     }
 
     key = cacheKey(source.countryCode, source.scope, year);
     cached = readCache(key);
+
+    /* onReady обязан сработать ровно один раз: у вызывающего это шаг очереди
+     * (sendHolidayBitsets), и второй вызов сдвигает очередь ещё раз — часть
+     * заданий пропускается, и год праздников молча не доезжает до часов.
+     * Поэтому при устаревшем кеше отдаём его сразу, а обновление только
+     * перезаписывает кеш — свежие данные уедут на следующем запуске.
+     */
+    var alreadyAnswered = false;
+
+    function answer(dates, meta) {
+        if (alreadyAnswered) {
+            return;
+        }
+        alreadyAnswered = true;
+        onReady(dates, meta);
+    }
 
     function refresh() {
         fetchRawCountryYear(source.countryCode, year, function(raw) {
@@ -259,7 +296,7 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
                     dates: dates.length
                 });
             }
-            onReady(dates, { status: 'fresh', source: fresh.source });
+            answer(dates, { status: 'fresh', source: fresh.source });
         }, function(error) {
             console.log('[holidays] refresh failed for ' + key + ': ' + JSON.stringify(error));
             if (typeof debugLog === 'function') {
@@ -272,9 +309,7 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
                     error: error
                 });
             }
-            if (!cached) {
-                onReady([], { status: 'failed_empty', error: error });
-            }
+            answer([], { status: 'failed_empty', error: error });
         }, debugLog);
     }
 
@@ -289,7 +324,7 @@ function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
                 fetchedAtUtc: cached.fetchedAtUtc
             });
         }
-        onReady(cached.dates, {
+        answer(cached.dates, {
             status: isStale(cached, nowMs) ? 'stale' : 'cached',
             source: cached.source
         });
@@ -423,7 +458,9 @@ function sendHolidayBitsets(settings, onDone, debugLog) {
                 HOLIDAY_SLOT: job.slot,
                 HOLIDAY_SET: job.holidaySet,
                 HOLIDAY_YEAR: job.year,
-                HOLIDAY_BITS: packHolidayBits(job.year, dates)
+                HOLIDAY_BITS: packHolidayBits(job.year, dates),
+                HOLIDAY_WORKING_BITS: packHolidayBits(job.year,
+                    job.holidaySet === HOLIDAY_SET_RU ? ruCalendar.workingDatesForYear(job.year) : [])
             };
 
             Pebble.sendAppMessage(payload, function() {

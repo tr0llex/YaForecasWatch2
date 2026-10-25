@@ -1,6 +1,47 @@
 var WeatherProvider = require('./provider.js');
 var request = WeatherProvider.request;
 
+var CONDITION = WeatherProvider.CONDITION;
+
+/**
+ * Map an OpenWeatherMap condition id onto the shared condition set.
+ *
+ * Groups are documented at openweathermap.org/weather-conditions: 2xx
+ * thunderstorm, 3xx drizzle, 5xx rain, 6xx snow, 7xx atmosphere (fog, haze,
+ * dust), 800 clear, 801/802 few and scattered clouds, 803/804 overcast.
+ *
+ * @param {*} id OpenWeatherMap condition id.
+ * @returns {number} Shared condition code.
+ */
+function owmCondition(id) {
+    if (typeof id !== 'number' || !isFinite(id)) {
+        return CONDITION.UNKNOWN;
+    }
+    if (id >= 200 && id < 300) {
+        return CONDITION.THUNDERSTORM;
+    }
+    if (id >= 300 && id < 600) {
+        return CONDITION.RAIN;
+    }
+    if (id >= 600 && id < 700) {
+        return CONDITION.SNOW;
+    }
+    if (id >= 700 && id < 800) {
+        return CONDITION.FOG;
+    }
+    if (id === 800) {
+        return CONDITION.CLEAR;
+    }
+    if (id === 801 || id === 802) {
+        return CONDITION.PARTLY_CLOUDY;
+    }
+    if (id === 803 || id === 804) {
+        return CONDITION.CLOUDY;
+    }
+
+    return CONDITION.UNKNOWN;
+}
+
 var OpenWeatherMapProvider = function(apiKey) {
     this._super.call(this);
     this.name = 'OpenWeatherMap';
@@ -111,6 +152,10 @@ OpenWeatherMapProvider.prototype.withProviderData = function(lat, lon, force, on
         this.currentFeelsLike = typeof weatherData.current.feels_like === 'number'
             ? weatherData.current.feels_like
             : null;
+        this.condition = owmCondition(Array.isArray(weatherData.current.weather)
+            && weatherData.current.weather[0]
+            ? weatherData.current.weather[0].id
+            : null);
         onSuccess();
     }).bind(this), onFailure);
 };

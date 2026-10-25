@@ -7,7 +7,48 @@ var OPEN_METEO_API_URL = 'https://api.open-meteo.com/v1/forecast';
 var OPEN_METEO_WEATHER_CACHE_KEY = storageKeys.OPEN_METEO_WEATHER_CACHE_KEY;
 var OPEN_METEO_CACHE_VERSION = 1;
 var OPEN_METEO_HOURLY = 'temperature_2m,apparent_temperature,precipitation_probability,uv_index';
-var OPEN_METEO_CURRENT = 'temperature_2m,apparent_temperature';
+var OPEN_METEO_CURRENT = 'temperature_2m,apparent_temperature,weather_code';
+
+var CONDITION = WeatherProvider.CONDITION;
+
+/**
+ * Map a WMO weather code onto the shared condition set.
+ *
+ * Коды по таблице WMO 4677, которой пользуется Open-Meteo: 0 — ясно, 1..2 —
+ * переменная облачность, 3 — пасмурно, 45/48 — туман, 51..67 и 80..82 — дождь
+ * и морось, 71..77 и 85/86 — снег, 95..99 — гроза.
+ *
+ * @param {*} code WMO weather code.
+ * @returns {number} Shared condition code.
+ */
+function wmoCondition(code) {
+    if (typeof code !== 'number' || !isFinite(code)) {
+        return CONDITION.UNKNOWN;
+    }
+    if (code === 0) {
+        return CONDITION.CLEAR;
+    }
+    if (code === 1 || code === 2) {
+        return CONDITION.PARTLY_CLOUDY;
+    }
+    if (code === 3) {
+        return CONDITION.CLOUDY;
+    }
+    if (code === 45 || code === 48) {
+        return CONDITION.FOG;
+    }
+    if (code >= 95) {
+        return CONDITION.THUNDERSTORM;
+    }
+    if ((code >= 71 && code <= 77) || code === 85 || code === 86) {
+        return CONDITION.SNOW;
+    }
+    if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) {
+        return CONDITION.RAIN;
+    }
+
+    return CONDITION.UNKNOWN;
+}
 
 /**
  * Count finite values in an array for diagnostics.
@@ -113,6 +154,7 @@ function buildOpenMeteoCache(openMeteoData, lat, lon, cityName, countryCode) {
         countryCode: countryCode,
         currentTemp: currentTemp,
         currentFeelsLike: currentFeelsLike,
+        condition: wmoCondition(current ? current.weather_code : null),
         hourly: hourly
     };
 }

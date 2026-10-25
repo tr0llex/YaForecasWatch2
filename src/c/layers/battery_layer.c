@@ -1,4 +1,5 @@
 #include "battery_layer.h"
+#include "c/appendix/theme.h"
 #include "c/appendix/persist.h"
 #include "c/appendix/memory_log.h"
 #include "c/services/watch_services.h"
@@ -22,22 +23,31 @@ static void battery_state_handler(BatteryChargeState charge) {
 
 #ifdef PBL_COLOR
 static GColor get_battery_color(int level) {
+    /* Зелёный и жёлтый на белом фоне давали контраст 1.6 и 1.2 — на солнце
+     * индикатор пропадал целиком. theme_readable() затемняет их до читаемых,
+     * оставляя тот же оттенок; на тёмной теме цвета не меняются. */
     if (level >= 50)
-        return GColorGreen;
+        return theme_readable(GColorGreen);
     else if (level >= 30)
-        return GColorYellow;
+        return theme_readable(GColorYellow);
     else
-        return GColorRed;
+        return theme_readable(GColorRed);
 }
 #endif
 
 static void ensure_battery_power_bitmap_loaded(void) {
     if (!s_battery_power_bitmap) {
         s_battery_power_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BATTERY_CHARGING);
-        s_battery_palette[0] = GColorWhite;
+        if (!s_battery_power_bitmap) {
+            return;
+        }
         s_battery_palette[1] = GColorClear;
         gbitmap_set_palette(s_battery_power_bitmap, s_battery_palette, false);
     }
+    /* Цвет обновляем всегда, а не только при загрузке. Палитра не копируется
+     * (gbitmap_set_palette с free=false держит наш массив), а значок живёт,
+     * пока идёт зарядка: смена темы посреди неё оставляла его прежним. */
+    s_battery_palette[0] = theme_fg();
 }
 
 static void maybe_unload_battery_power_bitmap(bool show_power_icon) {
@@ -84,17 +94,21 @@ static void battery_update_proc(Layer *layer, GContext *ctx) {
 #ifdef PBL_COLOR
     graphics_context_set_fill_color(ctx, get_battery_color(battery_level));
 #else
-    graphics_context_set_fill_color(ctx, GColorWhite);
+    graphics_context_set_fill_color(ctx, theme_fg());
 #endif
     graphics_fill_rect(ctx, color_area, 0, GCornerNone);
 
     if (show_power_icon) {
         ensure_battery_power_bitmap_loaded();
-        draw_power_icon(ctx, h, s_battery_power_bitmap);
+        /* Ресурс может не загрузиться, а gbitmap_get_bounds(NULL) — это падение.
+         * Без значка зарядки циферблат остаётся читаемым. */
+        if (s_battery_power_bitmap) {
+            draw_power_icon(ctx, h, s_battery_power_bitmap);
+        }
     }
 
     // Draw the white battery outline
-    graphics_context_set_stroke_color(ctx, GColorWhite);
+    graphics_context_set_stroke_color(ctx, theme_fg());
     graphics_context_set_stroke_width(ctx, BATTERY_STROKE);
     graphics_draw_rect(ctx, GRect(battery_x, 0, battery_w, h));
 
@@ -125,6 +139,12 @@ void battery_layer_create(Layer* parent_layer, GRect frame) {
 }
 
 void battery_layer_refresh() {
+    /* Проверка как в остальных слоях: обновление приходит из app_message, а
+     * тот не знает, какие слои сейчас живы. Единственный слой без проверки —
+     * это ровно тот случай «App fault, PC: 0», который мы уже ловили. */
+    if (!s_battery_layer) {
+        return;
+    }
     layer_mark_dirty(s_battery_layer);
 }
 
@@ -138,6 +158,9 @@ void battery_layer_destroy() {
         gbitmap_destroy(s_battery_power_bitmap);
         s_battery_power_bitmap = NULL;
     }
-    layer_destroy(s_battery_layer);
+    if (s_battery_layer) {
+        layer_destroy(s_battery_layer);
+        s_battery_layer = NULL;
+    }
     MEMORY_LOG_HEAP("battery_layer_destroy:after");
 }
